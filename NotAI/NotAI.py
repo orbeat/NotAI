@@ -1,42 +1,3 @@
-import pyautogui
-import time
-#import keyboard #Using module keyboard
-#import PIL.Image as pilimg
-#from PIL import ImageGrab
-#import numpy as np
-import random
-import copy
-#import imp
-#import BSAI as bsai
-#from BSAI import *
-#import traceback
-
-#from PIL import Image
-#from pytesseract import *
-
-#import cv2
-#          게임 시작 시간                조작 시작 시간        _조작 시간                
-# data\img\yyyymmdd-himiss\clock()(%.6f)_push_t(%.6f)_조작키.png
-
-# 다음에 나올 블럭 인식 :  ㅜ,ㅁ,ㄱ,ㄱ 거울대칭,수줍은 ㄱ,수줍은 ㄱ거울 대칭,ㅡ
-# 적절한 DB 생성
-
-
-import sys
-from datetime import datetime
-from random import choice
-# The platformModule is where we reference the platform-specific functions.
-if sys.platform.startswith('java'):
-    #from . import _pyautogui_java as platformModule
-    raise NotImplementedError('Jython is not yet supported by PyAutoGUI.')
-elif sys.platform == 'darwin':
-    from . import _pyautogui_osx as platformModule
-elif sys.platform == 'win32':
-    import _pyautogui_win as platformModule
-    #import Window, getWindows, getWindow
-else:
-    from . import _pyautogui_x11 as platformModule
-
 from PIL import ImageGrab
 import PIL.Image as pilimg
 from time import perf_counter as clock, sleep
@@ -44,17 +5,21 @@ import pygetwindow as gw
 import numpy as np
 import os
 from PIL import Image
+from datetime import datetime
+from random import choice
+import _pyautogui_win as platformModule
+
 
 class Operation:
+
     def __init__(self):
-        font = np.array(pilimg.open(r'img\font.png')) # 글씨체 이미지를 읽어옴
+        font = np.array(pilimg.open(r'img\font.png'))  # 글씨체 이미지를 읽어옴
         self.number_font = []
         self.number_name = []
         for i in range(11):
-            x1, y1 = 1+8*i, 0
-            x2, y2 = x1+7, y1+8
-            # number_font.append(np.array(pilimg.open(r'img\font.png'))[y1:y2, x1:x2])
-            self.number_font.append( np.mean(font[y1:y2, x1:x2, 0:3], axis=2) )
+            x1, y1 = 1 + 8 * i, 0
+            x2, y2 = x1 + 7, y1 + 8
+            self.number_font.append(np.mean(font[y1:y2, x1:x2, 0:3], axis=2))
             self.number_name.append(i)
         self.number_name[-1] = 0
         self.number_font = np.array(self.number_font)
@@ -65,7 +30,7 @@ class Operation:
         # 블럭 이미지를 불러옴
         self.blocks_img = []
         for i in range(1, 8):
-            self.blocks_img.append( np.array(pilimg.open(r'img\pieces\%d.png' % i)) )
+            self.blocks_img.append(np.array(pilimg.open(r'img\pieces\%d.png' % i)))
             # print(self.blocks_img[i-1])
         
         print('블럭 데이터 준비중...')
@@ -90,7 +55,6 @@ class Operation:
         
         self.block_data_label = np.array(self.block_data_label)
         
-        
         # print(data_label)
         
         # 블럭 이미지의 배경 색(255,255,255)을 제외한 RGB별 평균 수치를 구함
@@ -103,9 +67,9 @@ class Operation:
         self.blocks_img = np.array(self.blocks_img)[:,:3]
         print(self.blocks_img)
         
-        self.key_li = ['z', 'x', 'left', 'right', 'down', ''] # 조작키 리스트
-        self.push_t = np.random.normal(0.5,1,1000)
-        self.push_t = self.push_t[self.push_t>0] # 조작키를 누르는 시간(정규분포(0이하의 값들은 버림))
+        self.key_li = ['z', 'x', 'left', 'right', 'down', '']  # 조작키 리스트
+        self.push_t = np.random.normal(0.5, 1, 1000)
+        self.push_t = self.push_t[self.push_t > 0]  # 조작키를 누르는 시간(정규분포(0이하의 값들은 버림))
         
         self.windows = None
         self.full_screenshot = None
@@ -113,22 +77,23 @@ class Operation:
         self.score, self.level, self.line = None, None, None
         self.next_piece = None
     
-    def avg_RGB(self, img): # 해당 이미지에서 완전한 흰색(배경)을 제외한 RGB값의 평균을 반환함
-        return np.mean(img[np.any(img[:,:,:3]!=np.array([255,255,255]), axis=2)], axis=0)
+    def avg_RGB(self, img):  # 해당 이미지에서 완전한 흰색(배경)을 제외한 RGB값의 평균을 반환함
+        img = img[np.any(img[:,:,:3] != np.array([255, 255, 255]), axis=2)]  # 배경색([255,255,255]) 제외
+        return np.mean(img, axis=0)  # 배경을 제외한 RGB값의 평균을 반환
     
     def check_score(self):
         score = 0
         num = None
         x1, y1, x2, y2 = None, None, None, None
         for i in range(6):
-            x1, y1 = 147-8*i, 50
-            x2, y2 = x1+7, y1+8
-            # print(full_screenshot)
-            # print(np.mean(full_screenshot[y1:y2, x1:x2], axis=2))
-            # print(np.all(np.all(np.mean(full_screenshot[y1:y2, x1:x2], axis=2)==font, axis=2), axis=1))
-            # print(name[np.all(np.all(np.mean(full_screenshot[y1:y2, x1:x2], axis=2)==font, axis=2), axis=1)][0])
-            num = self.number_name[np.all(np.all(np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2)==self.number_font, axis=2), axis=1)][0]
-            score += 10**i * num
+            x1, y1 = 147 - 8 * i, 50
+            x2, y2 = x1 + 7, y1 + 8
+            avg = np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2) # 스크린샷의 각 픽셀별 평균
+            bo = avg == self.number_font # 숫자 이미지의 픽셀값과 정확하게 일치하는 픽셀(각각의 숫자 이미지에 대한 값을 모두 구함)
+            bo = np.all(bo, axis=2) # 해당 줄의 픽셀값이 전부 같으면 True
+            bo = np.all(bo, axis=1) # 해당 열의 픽셀값이 전부 같으면 True
+            num = self.number_name[bo][0] # 최종적으로 픽셀값이 완전히 일치하는 숫자 이미지를 찾아냄
+            score += 10 ** i * num # 점수 더하기
         return score
     
     def check_level(self):
@@ -136,10 +101,10 @@ class Operation:
         num = None
         x1, y1, x2, y2 = None, None, None, None
         for i in range(2):
-            x1, y1 = 139-8*i, 82
-            x2, y2 = x1+7, y1+8
-            num = self.number_name[np.all(np.all(np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2)==self.number_font, axis=2), axis=1)][0]
-            level += 10**i * num
+            x1, y1 = 139 - 8 * i, 82
+            x2, y2 = x1 + 7, y1 + 8
+            num = self.number_name[np.all(np.all(np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2) == self.number_font, axis=2), axis=1)][0]
+            level += 10 ** i * num
         return level
     
     def check_line(self):
@@ -147,10 +112,10 @@ class Operation:
         num = None
         x1, y1, x2, y2 = None, None, None, None
         for i in range(3):
-            x1, y1 = 139-8*i, 106
-            x2, y2 = x1+7, y1+8
-            num = self.number_name[np.all(np.all(np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2)==self.number_font, axis=2), axis=1)][0]
-            line += 10**i * num
+            x1, y1 = 139 - 8 * i, 106
+            x2, y2 = x1 + 7, y1 + 8
+            num = self.number_name[np.all(np.all(np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2) == self.number_font, axis=2), axis=1)][0]
+            line += 10 ** i * num
         return line
     
     def check_next_piece(self):
@@ -163,25 +128,25 @@ class Operation:
         print(av, av[0], type(av[0]))
         cha = np.abs(self.blocks_img - av)
         # print(cha)
-        hap = np.min(cha, axis=1)#np.sum(cha, axis=1)
+        hap = np.min(cha, axis=1)  # np.sum(cha, axis=1)
         print(hap)
-        bo = hap==np.min(hap)
+        bo = hap == np.min(hap)
         return  np.arange(1, 8)[bo]
     
     def check_block(self):
-        pool_img = _Pooling(self.POOLING_X,self.POOLING_Y,self.full_screenshot[129:162, 122:155])
+        pool_img = _Pooling(self.POOLING_X, self.POOLING_Y, self.full_screenshot[129:162, 122:155])
         
-        cha = np.abs(self.block_data-pool_img)
+        cha = np.abs(self.block_data - pool_img)
         # print(cha.shape)
         hap = np.sum(np.sum(np.sum(cha, axis=3), axis=2), axis=1)
-        bo = hap==np.min(hap)
+        bo = hap == np.min(hap)
         return self.block_data_label[bo]
     
     def game(self):
         print('창 위치 확인')
         self.windows = window_info('Not Tetris 2')
         print(self.windows)
-        if self.windows==-1:
+        if self.windows == -1:
             print('실행 중인지 확인')
             exit()
             
@@ -190,8 +155,7 @@ class Operation:
             # full_screenshot = np.array(ImageGrab.grab(bbox=(windows.left, windows.top, windows.right, windows.bottom)))
             full_screenshot = _full_screenshot(self.windows, npsw=False)
             t2 = clock()
-            print(t2-t1)
-
+            print(t2 - t1)
             
         print('준비중...')
         c_x1, c_x2, c_y1, c_y2 = 28, 92, 46, 75
@@ -205,7 +169,7 @@ class Operation:
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
                 
             for i, v in enumerate(self.check_lobby_img):
-                if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==v):
+                if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == v):
                     self.check_lobby[i] = True
         # print(check_lobby)
             
@@ -227,7 +191,7 @@ class Operation:
         while True:
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
             screenshots.append(self.full_screenshot)
-            if ( np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_game_over_img) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_lobby_img[0]) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_lobby_img[1]) ):
+            if (np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1])):
                 self.end_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
                 self.end_game_clock = clock()
                 break
@@ -241,27 +205,9 @@ class Operation:
             self.score = self.check_score()
             self.level = self.check_level()
             self.line = self.check_line()
-            # self.next_piece = self.check_next_piece()
-            # t1 = clock()
             self.next_piece = self.check_block()[0]
             t2 = clock()
-            # piece1 = [1]
-            # piece2 = [1]
-            # piece3 = [1]
-            # while True:
-                # # print('df')
-                # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
-                # t1 = clock()
-                # piece3 = piece2
-                # piece2 = piece1
-                # piece1 = self.check_block()
-                # t2 = clock()
-                # for temp in piece1:
-                    # print(piece1, piece2, piece3, temp)
-                    # if piece2[0]!=piece1[0] and piece2[0]!=piece3[0]:
-                        # print(piece1, piece2, piece3, temp)
-                        # exit()
-            print(self.next_piece, t2-t1)
+            print(self.next_piece, t2 - t1)
             print("%.4f\t%d\t%d\t%d\t%s\t%.6f\t%s" % (current_clock, self.score, self.level, self.line, key, push_t, self.next_piece))
             info_li.append({'current_clock':current_clock,
                              'score':self.score,
@@ -272,11 +218,10 @@ class Operation:
                              'next_piece':self.next_piece})
         #=========================================================================================================
         ############################################################################################################
-        
                 
-        print(np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_game_over_img), np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_lobby_img[0]), np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_lobby_img[1]))
+        print(np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img), np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]), np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1]))
         
-        if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_game_over_img):
+        if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img):
             self.score = self.check_score()
             self.level = self.check_level()
             self.line = self.check_line()
@@ -295,22 +240,17 @@ class Operation:
         createFolder(r'data\log')
         f = open(r'data\log\%s_%.6f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
         for i, v in enumerate(info_li):
-            # print(i,v)
-            # print(_dir)
-            # print(r'\%.6f_%.6f_%s.png' % (v['current_clock'], v['push_t'], v['key']))
             _path = _dir + r'\%.6f_%.6f_%s.png' % (v['current_clock'], v['push_t'], v['key'])
             Image.fromarray(screenshots[i], 'RGB').save(_path)
             
-            # print('%.6f\t%.6f\t%s' % (v['current_clock']), v['push_t'], v['key'])
             f.write('%.6f\t%.6f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
-                                                          , v['score'], v['level'], v['line'], v['next_piece']) )
+                                                          , v['score'], v['level'], v['line'], v['next_piece']))
         f.close()
         print('데이터 저장 완료', clock())
             
-            
         _press('left', 1)
             
-        while not np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==self.check_lobby_img[0]): # 로비로 나왔는지 확인함
+        while not np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]):  # 로비로 나왔는지 확인함
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
         
         # 신기록 달성인지 확인함
@@ -319,11 +259,11 @@ class Operation:
         while True:
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
             for i, v in enumerate(self.check_lobby_img):
-                if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==v):
+                if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == v):
                     self.check_lobby[i] = True
-            if clock()-t1 > 3: break
+            if clock() - t1 > 3: break
                 
-        if not all(self.check_lobby): # 신기록 달성시 이름 입력
+        if not all(self.check_lobby):  # 신기록 달성시 이름 입력
             print('신기록 달성?', self.check_lobby)
             _press('down', 0)
             
@@ -332,11 +272,11 @@ class Operation:
             while True:
                 self.full_screenshot = _full_screenshot(self.windows, npsw=True)
                 for i, v in enumerate(self.check_lobby_img):
-                    if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2]==v):
+                    if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == v):
                         self.check_lobby[i] = True
-                if clock()-t1 > 3: break
+                if clock() - t1 > 3: break
             
-            if not all(self.check_lobby):# or True:
+            if not all(self.check_lobby):  # or True:
                 print('신기록 달성', self.check_lobby)
                 NTAI_NAME = datetime.strftime(datetime.today(), '%y%m%d')
                 
@@ -353,15 +293,14 @@ class Operation:
                 
                 self.full_screenshot = _full_screenshot(self.windows, npsw=False)
                 self.full_screenshot.save(r'report\new_record\%s_2.png' % self.end_game_time)
-            
 
 
-def createFolder(directory): # 출처: https://data-make.tistory.com/170 [Data Makes Our Future]
+def createFolder(directory):  # 출처: https://data-make.tistory.com/170 [Data Makes Our Future]
     try:
         if not os.path.exists(directory):
             os.makedirs(directory)
     except OSError:
-        print ('Error: Creating directory. ' +  directory)
+        print ('Error: Creating directory. ' + directory)
         
 
 def im2col(input_data, filter_h, filter_w, stride=1, pad=0):
@@ -383,7 +322,7 @@ def im2col(input_data, filter_h, filter_w, stride=1, pad=0):
     #"""
     N, C, H, W = input_data.shape
     # print(N, C, H, W)
-    out_h = (H + 2 * pad - filter_h) // stride + 1   # 위의 출력크기 공식을 이용하여 구현
+    out_h = (H + 2 * pad - filter_h) // stride + 1  # 위의 출력크기 공식을 이용하여 구현
     out_w = (W + 2 * pad - filter_w) // stride + 1
 
     img = np.pad(input_data, [(0, 0), (0, 0), (pad, pad), (pad, pad)], 'constant')
@@ -395,15 +334,16 @@ def im2col(input_data, filter_h, filter_w, stride=1, pad=0):
         y_max = y + stride * out_h
         for x in range(filter_w):
             x_max = x + stride * out_w
-            col[:, :, y, x, :, :] = img[:, :, y:y_max:stride, x:x_max:stride]
+            col[:,:, y, x,:,:] = img[:,:, y:y_max:stride, x:x_max:stride]
             
     # print(col)
     col = col.transpose(0, 4, 5, 1, 2, 3).reshape(N * out_h * out_w, -1)
 
-
     return col
 
-class Pooling: # 출처 : 밑바닥부터 시작하는 딥러닝(249p)
+
+class Pooling:  # 출처 : 밑바닥부터 시작하는 딥러닝(249p)
+
     def __init__(self, pool_h, pool_w, stride=1, pad=0):
         self.pool_h = pool_h
         self.pool_w = pool_w
@@ -427,9 +367,10 @@ class Pooling: # 출처 : 밑바닥부터 시작하는 딥러닝(249p)
 
         return out
 
-def _Pooling(pool_x, pool_y, image): # 최소 풀링 함수(풀링 필터의 가로 세로 크기와 이미지를 받아 풀링된 값을 반환함)
+
+def _Pooling(pool_x, pool_y, image):  # 최소 풀링 함수(풀링 필터의 가로 세로 크기와 이미지를 받아 풀링된 값을 반환함)
     temp = []
-    temp.append(image[:, :, 0:3])
+    temp.append(image[:,:, 0:3])
     image = np.array(temp)
     image = image.transpose(0, 3, 1, 2)
         
@@ -439,13 +380,14 @@ def _Pooling(pool_x, pool_y, image): # 최소 풀링 함수(풀링 필터의 가
 
     return image[0]
 
-def _press(key, s): # key를 s초 동안 눌렀다가 뗌
+
+def _press(key, s):  # key를 s초 동안 눌렀다가 뗌
     while True:
-        #pyautogui._failSafeCheck()
+        # pyautogui._failSafeCheck()
         try:
             t1 = clock()
             platformModule._keyDown(key)
-            #while True:
+            # while True:
             sleep(s)
             platformModule._keyUp(key)
             break
@@ -454,24 +396,27 @@ def _press(key, s): # key를 s초 동안 눌렀다가 뗌
             exit()
             pass
 
+
 def window_info(target):
-    titles = gw.getAllTitles() #현재 생성 되어있는 윈도우 창들의 타이틀 제목을 가져 온다.
+    titles = gw.getAllTitles()  # 현재 생성 되어있는 윈도우 창들의 타이틀 제목을 가져 온다.
     for i, name in enumerate(titles):
         # print(i, name)
-        if name==target:
-            return gw.getWindowsWithTitle(titles[0])[i] # 목표 윈도우의 위치를 가져옴
+        if name == target:
+            return gw.getWindowsWithTitle(titles[0])[i]  # 목표 윈도우의 위치를 가져옴
     return -1
+
 
 def _full_screenshot(windows, npsw=True):
     # npsw : numpy배열로 변환하여 반환하면 True
-    x1 = windows.left#+5
-    y1 = windows.top#+28
+    x1 = windows.left  # +5
+    y1 = windows.top  # +28
     x2 = windows.right
     y2 = windows.bottom
     if npsw: return np.array(ImageGrab.grab(bbox=(x1, y1, x2, y2)))
     else: return ImageGrab.grab(bbox=(x1, y1, x2, y2))
 
-if __name__=='__main__':
+
+if __name__ == '__main__':
     oper = None
     while True:
         oper = Operation()
