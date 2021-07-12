@@ -2,6 +2,8 @@
 
 Not Tetris 2 다운로드 : https://stabyourself.net/nottetris2/
 
+
+
 실행 방법
 1. Not Tetris 2 실행
 2. OPTIONS > SCALE 옵션을 1로 설정(방향키와 엔터로 조작)
