@@ -183,39 +183,44 @@ class Operation:
         self.start_game_clock = clock()
         ############################################################################################################
         #=========================================================================================================
+        print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ('현재 시각', '현재 점수', '현재 레벨', '현재 부순 줄', '방금 누른 키', '키를 누른 시간',
+                                                            '다음 블록', '계산 시간'))
         key = None
         push_t = None
         current_clock = None
-        screenshots = []
+        # screenshots = []
         info_li = []
         while True:
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
-            screenshots.append(self.full_screenshot)
+            # screenshots.append(self.full_screenshot)
             if (np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1])):
                 self.end_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
                 self.end_game_clock = clock()
                 break
             
-            key = choice(self.key_li)
-            push_t = choice(self.push_t)
-            current_clock = clock()
-            _press(key, push_t)
+            key = choice(self.key_li) # 누를키를 랜덤으로 선택함
+            push_t = choice(self.push_t) # 특정 키를 누를 시간을 선택함
+            current_clock = clock() # 현재 시각을 저장함
+            _press(key, push_t) # 특정 키를 일정 시간동안 누름
             
             t1 = clock()
             self.score = self.check_score()
             self.level = self.check_level()
             self.line = self.check_line()
             self.next_piece = self.check_block()[0]
-            t2 = clock()
-            print(self.next_piece, t2 - t1)
-            print("%.4f\t%d\t%d\t%d\t%s\t%.6f\t%s" % (current_clock, self.score, self.level, self.line, key, push_t, self.next_piece))
+            
             info_li.append({'current_clock':current_clock,
                              'score':self.score,
                              'level':self.level,
                              'line':self.line,
                              'key':key,
                              'push_t':push_t,
-                             'next_piece':self.next_piece})
+                             'next_piece':self.next_piece,
+                             'screenshot':self.full_screenshot})
+            t2 = clock()
+            print("%.4f\t%d\t%d\t%d\t%s\t%.6f\t%s\t%.6f" % (current_clock, self.score, self.level, self.line, key, push_t,
+                                                            self.next_piece, t2-t1))
+            # print(self.next_piece, t2 - t1)
         #=========================================================================================================
         ############################################################################################################
                 
@@ -237,11 +242,12 @@ class Operation:
         # data\img\yyyymmdd-himiss_clock()\clock()(%.6f)_push_t(%.6f)_조작키.png
         # _dir = None
         _path = None
+        # 추후 OracleDB에 바로 저장하도록 바꾸기(스크린샷은 그대로 폴더에 저장)
         createFolder(r'data\log')
         f = open(r'data\log\%s_%.6f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
         for i, v in enumerate(info_li):
             _path = _dir + r'\%.6f_%.6f_%s.png' % (v['current_clock'], v['push_t'], v['key'])
-            Image.fromarray(screenshots[i], 'RGB').save(_path)
+            Image.fromarray(v['screenshot'], 'RGB').save(_path)
             
             f.write('%.6f\t%.6f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
                                                           , v['score'], v['level'], v['line'], v['next_piece']))
@@ -417,7 +423,6 @@ def _full_screenshot(windows, npsw=True):
 
 
 if __name__ == '__main__':
-    oper = None
+    oper = Operation()
     while True:
-        oper = Operation()
         oper.game()
