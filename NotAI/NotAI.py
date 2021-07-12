@@ -292,6 +292,7 @@ class Operation:
         # data\img\yyyymmdd-himiss_clock()\clock()(%.6f)_push_t(%.6f)_조작키.png
         # _dir = None
         _path = None
+        createFolder(r'data\log')
         f = open(r'data\log\%s_%.6f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
         for i, v in enumerate(info_li):
             # print(i,v)
@@ -340,6 +341,8 @@ class Operation:
                 NTAI_NAME = datetime.strftime(datetime.today(), '%y%m%d')
                 
                 # now = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S') # 나중에 게임 종료 시각으로 수정하기
+                createFolder(r'report\log')
+                createFolder(r'report\new_record')
                 self.full_screenshot = _full_screenshot(self.windows, npsw=False)
                 self.full_screenshot.save(r'report\new_record\%s.png' % self.end_game_time)
                 
@@ -469,6 +472,7 @@ def _full_screenshot(windows, npsw=True):
     else: return ImageGrab.grab(bbox=(x1, y1, x2, y2))
 
 if __name__=='__main__':
+    oper = None
     while True:
         oper = Operation()
         oper.game()
