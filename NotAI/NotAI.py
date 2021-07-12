@@ -421,7 +421,6 @@ def _full_screenshot(windows, npsw=True):
     if npsw: return np.array(ImageGrab.grab(bbox=(x1, y1, x2, y2)))
     else: return ImageGrab.grab(bbox=(x1, y1, x2, y2))
 
-
 if __name__ == '__main__':
     oper = Operation()
     while True:
