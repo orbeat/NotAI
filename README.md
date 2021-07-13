@@ -1,9 +1,8 @@
 # NotAI
 
-python version : 3.6.8
+Python version : 3.6.8
 
 Not Tetris 2 다운로드 : https://stabyourself.net/nottetris2/
-
 
 
 실행 방법

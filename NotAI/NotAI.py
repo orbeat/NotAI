@@ -177,21 +177,25 @@ class Operation:
         _press('enter', 0)
         _press('enter', 0)
         sleep(1)
-        _press('enter', 0)
-        # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
-        self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
-        self.start_game_clock = clock()
-        ############################################################################################################
-        #=========================================================================================================
-        print("%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ('현재 시각', '현재 점수', '현재 레벨', '현재 부순 줄', '방금 누른 키', '키를 누른 시간',
-                                                            '다음 블록', '계산 시간'))
+        print("%s\t\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ('현재 시각', '현재 점수', '현재 레벨', '현재 부순 줄', '방금 누른 키', '키를 누른 시간',
+                                                            '다음 블록', '계산 시간', '캡쳐 시간'))
         key = None
         push_t = None
         current_clock = None
         # screenshots = []
         info_li = []
+        t1, t2 = None, None
+        t3, t4 = None, None
+        ############################################################################################################
+        #=========================================================================================================
+        _press('enter', 0) # 일시정지 해제
+        # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
+        self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
+        self.start_game_clock = clock()
         while True:
+            t3 = clock()
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
+            t4 = clock()
             # screenshots.append(self.full_screenshot)
             if (np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1])):
                 self.end_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
@@ -218,8 +222,8 @@ class Operation:
                              'next_piece':self.next_piece,
                              'screenshot':self.full_screenshot})
             t2 = clock()
-            print("%.4f\t%d\t%d\t%d\t%s\t%.6f\t%s\t%.6f" % (current_clock, self.score, self.level, self.line, key, push_t,
-                                                            self.next_piece, t2-t1))
+            print("%.4f  \t%d\t%d\t%d\t%s\t%.6f\t%s\t%.5f\t%.6f" % (current_clock, self.score, self.level, self.line, key, push_t,
+                                                            self.next_piece, t2-t1, t4-t3))
             # print(self.next_piece, t2 - t1)
         #=========================================================================================================
         ############################################################################################################
@@ -391,13 +395,14 @@ def _press(key, s):  # key를 s초 동안 눌렀다가 뗌
     while True:
         # pyautogui._failSafeCheck()
         try:
-            t1 = clock()
+            # t1 = clock()
             platformModule._keyDown(key)
             # while True:
             sleep(s)
             platformModule._keyUp(key)
             break
-        except:
+        except Exception as e:
+            print(e)
             print('_press() error')
             exit()
             pass
