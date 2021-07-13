@@ -8,7 +8,10 @@ from PIL import Image
 from datetime import datetime
 from random import choice
 import _pyautogui_win as platformModule
-from cx_Oracle import connect
+try:
+    from cx_Oracle import connect
+except Exception as e:
+    print(e)
 
 
 class Operation:
@@ -148,29 +151,32 @@ class Operation:
         return self.block_data_label[bo]
     
     def save_data(self):
-        con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip)) # db에 연결
-        cur = con.cursor()
-        
-        sql = """
-        insert into NotAI_game
-        values (NotAI_game_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
-        """ % (self.start_game_time, self.start_game_clock, self.end_game_time, self.end_game_clock)
-        # print(sql)
-        cur.execute(sql)
-        
-        con.commit() # 실제로 DB서버에 반영
-        
-        sql = """
-        select max(ng_no) from NotAI_game
-        """
-        # print(sql)
-        cur.execute(sql)
-        ng_no = None
-        for i in cur:
-            ng_no = i[0]
-        # exit()
-              
-        # con.close()
+        try:
+            con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip)) # db에 연결
+            cur = con.cursor()
+            
+            sql = """
+            insert into NotAI_game
+            values (NotAI_game_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
+            """ % (self.start_game_time, self.start_game_clock, self.end_game_time, self.end_game_clock)
+            # print(sql)
+            cur.execute(sql)
+            
+            con.commit() # 실제로 DB서버에 반영
+            
+            sql = """
+            select max(ng_no) from NotAI_game
+            """
+            # print(sql)
+            cur.execute(sql)
+            ng_no = None
+            for i in cur:
+                ng_no = i[0]
+            # exit()
+                  
+            # con.close()
+        except Exception as e:
+            print('DB저장 실패', e)
         
         _dir = r'\orbeat\NotAI\data\img\%s_%.6f' % (self.start_game_time, self.start_game_clock)
         createFolder(_dir)
@@ -190,17 +196,23 @@ class Operation:
             f.write('%.6f\t%.6f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
                                                           , v['score'], v['level'], v['line'], v['next_piece']))
             
-            sql = """
-            insert into NotAI_Control
-            values (NotAI_Control_seq.nextval, '%s', %.6f, %.6f, %d, %d, %d, '%s', %d)
-            """ % (v['key'], v['current_clock'], v['push_t'], v['score'], v['level'], v['line'], v['next_piece'], ng_no)
-            # print(sql)
-            cur.execute(sql)
+            try:
+                sql = """
+                insert into NotAI_Control
+                values (NotAI_Control_seq.nextval, '%s', %.6f, %.6f, %d, %d, %d, '%s', %d)
+                """ % (v['key'], v['current_clock'], v['push_t'], v['score'], v['level'], v['line'], v['next_piece'], ng_no)
+                # print(sql)
+                cur.execute(sql)
+            except Exception as e:
+                print('DB 저장 실패', e)
             
         f.close()
         
-        con.commit() # 실제로 DB서버에 반영          
-        con.close()
+        try:
+            con.commit() # 실제로 DB서버에 반영          
+            con.close()
+        except Exception as e:
+            print('commit error :', e)
     
     def game(self):
         print('창 위치 확인')
