@@ -8,11 +8,15 @@ from PIL import Image
 from datetime import datetime
 from random import choice
 import _pyautogui_win as platformModule
+from cx_Oracle import connect
 
 
 class Operation:
 
-    def __init__(self):
+    def __init__(self, db='choi', db_name='choi', ip='localhost'):
+        clock()
+        self.db, self.db_name, self.ip = db, db_name, ip
+        
         font = np.array(pilimg.open(r'img\font.png'))  # 글씨체 이미지를 읽어옴
         self.number_font = []
         self.number_name = []
@@ -67,7 +71,7 @@ class Operation:
         self.blocks_img = np.array(self.blocks_img)[:,:3]
         print(self.blocks_img)
         
-        self.key_li = ['z', 'x', 'left', 'right', 'down', '']  # 조작키 리스트
+        self.key_li = ['z', 'x', 'left', 'right', 'down', ' ']  # 조작키 리스트
         self.push_t = np.random.normal(0.5, 1, 1000)
         self.push_t = self.push_t[self.push_t > 0]  # 조작키를 누르는 시간(정규분포(0이하의 값들은 버림))
         
@@ -76,6 +80,7 @@ class Operation:
         self.check_lobby = None
         self.score, self.level, self.line = None, None, None
         self.next_piece = None
+        self.info_li = []
     
     def avg_RGB(self, img):  # 해당 이미지에서 완전한 흰색(배경)을 제외한 RGB값의 평균을 반환함
         img = img[np.any(img[:,:,:3] != np.array([255, 255, 255]), axis=2)]  # 배경색([255,255,255]) 제외
@@ -142,6 +147,61 @@ class Operation:
         bo = hap == np.min(hap)
         return self.block_data_label[bo]
     
+    def save_data(self):
+        con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip)) # db에 연결
+        cur = con.cursor()
+        
+        sql = """
+        insert into NotAI_game
+        values (NotAI_game_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
+        """ % (self.start_game_time, self.start_game_clock, self.end_game_time, self.end_game_clock)
+        # print(sql)
+        cur.execute(sql)
+        
+        con.commit() # 실제로 DB서버에 반영
+        
+        sql = """
+        select max(ng_no) from NotAI_game
+        """
+        # print(sql)
+        cur.execute(sql)
+        ng_no = None
+        for i in cur:
+            ng_no = i[0]
+        # exit()
+              
+        # con.close()
+        
+        _dir = r'\orbeat\NotAI\data\img\%s_%.6f' % (self.start_game_time, self.start_game_clock)
+        createFolder(_dir)
+        
+        #          게임 시작 시간             _시작 클럭      조작 시작 시각        _조작 시간                
+        # data\img\yyyymmdd-himiss_clock()\clock()(%.6f)_push_t(%.6f)_조작키.png
+        # _dir = None
+        _path = None
+        # 추후 OracleDB에 바로 저장하도록 바꾸기(스크린샷은 그대로 폴더에 저장)
+        
+        createFolder(r'\orbeat\NotAI\data\log')
+        f = open(r'\orbeat\NotAI\data\log\%s_%.6f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
+        for i, v in enumerate(self.info_li):
+            _path = _dir + r'\%.6f_%.6f_%s.png' % (v['current_clock'], v['push_t'], v['key'])
+            Image.fromarray(v['screenshot'], 'RGB').save(_path)
+            
+            f.write('%.6f\t%.6f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
+                                                          , v['score'], v['level'], v['line'], v['next_piece']))
+            
+            sql = """
+            insert into NotAI_Control
+            values (NotAI_Control_seq.nextval, '%s', %.6f, %.6f, %d, %d, %d, '%s', %d)
+            """ % (v['key'], v['current_clock'], v['push_t'], v['score'], v['level'], v['line'], v['next_piece'], ng_no)
+            # print(sql)
+            cur.execute(sql)
+            
+        f.close()
+        
+        con.commit() # 실제로 DB서버에 반영          
+        con.close()
+    
     def game(self):
         print('창 위치 확인')
         self.windows = window_info('Not Tetris 2')
@@ -183,7 +243,7 @@ class Operation:
         push_t = None
         current_clock = None
         # screenshots = []
-        info_li = []
+        self.info_li = []
         t1, t2 = None, None
         t3, t4 = None, None
         ############################################################################################################
@@ -192,6 +252,7 @@ class Operation:
         # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
         self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
         self.start_game_clock = clock()
+        # print(self.start_game_clock)
         while True:
             t3 = clock()
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
@@ -213,7 +274,7 @@ class Operation:
             self.line = self.check_line()
             self.next_piece = self.check_block()[0]
             
-            info_li.append({'current_clock':current_clock,
+            self.info_li.append({'current_clock':current_clock,
                              'score':self.score,
                              'level':self.level,
                              'line':self.line,
@@ -239,23 +300,7 @@ class Operation:
         print('게임 종료')
         
         print('데이터 저장 중', clock())
-        _dir = r'data\img\%s_%.6f' % (self.start_game_time, self.start_game_clock)
-        createFolder(_dir)
-        
-        #          게임 시작 시간             _시작 클럭      조작 시작 시각        _조작 시간                
-        # data\img\yyyymmdd-himiss_clock()\clock()(%.6f)_push_t(%.6f)_조작키.png
-        # _dir = None
-        _path = None
-        # 추후 OracleDB에 바로 저장하도록 바꾸기(스크린샷은 그대로 폴더에 저장)
-        createFolder(r'data\log')
-        f = open(r'data\log\%s_%.6f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
-        for i, v in enumerate(info_li):
-            _path = _dir + r'\%.6f_%.6f_%s.png' % (v['current_clock'], v['push_t'], v['key'])
-            Image.fromarray(v['screenshot'], 'RGB').save(_path)
-            
-            f.write('%.6f\t%.6f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
-                                                          , v['score'], v['level'], v['line'], v['next_piece']))
-        f.close()
+        self.save_data()
         print('데이터 저장 완료', clock())
             
         _press('left', 1)
