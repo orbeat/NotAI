@@ -74,7 +74,7 @@ class Operation:
         self.blocks_img = np.array(self.blocks_img)[:,:3]
         print(self.blocks_img)
         
-        self.key_li = ['z', 'x', 'left', 'right', 'down', ' ']  # 조작키 리스트
+        self.key_li = ['z', 'x', 'left', 'right', 'down', 'g']  # 조작키 리스트(g키는 기능이 없는 키)
         self.push_t = np.random.normal(0.5, 1, 1000)
         self.push_t = self.push_t[self.push_t > 0]  # 조작키를 누르는 시간(정규분포(0이하의 값들은 버림))
         
@@ -246,8 +246,8 @@ class Operation:
         # print(check_lobby)
             
         print('게임 시작')
-        _press('enter', 0)
-        _press('enter', 0)
+        _press('enter', 0) # 게임 시작
+        _press('enter', 0) # 일시정지
         sleep(1)
         print("%s\t\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ('현재 시각', '현재 점수', '현재 레벨', '현재 부순 줄', '방금 누른 키', '키를 누른 시간',
                                                             '다음 블록', '계산 시간', '캡쳐 시간'))
@@ -298,6 +298,7 @@ class Operation:
             print("%.4f  \t%d\t%d\t%d\t%s\t%.6f\t%s\t%.5f\t%.6f" % (current_clock, self.score, self.level, self.line, key, push_t,
                                                             self.next_piece, t2-t1, t4-t3))
             # print(self.next_piece, t2 - t1)
+            
         #=========================================================================================================
         ############################################################################################################
                 
