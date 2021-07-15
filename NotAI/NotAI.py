@@ -6,7 +6,7 @@ import numpy as np
 import os
 from PIL import Image
 from datetime import datetime
-from random import choice
+from random import choice, sample, random
 import _pyautogui_win as platformModule
 from threading import Thread
 try:
@@ -75,7 +75,7 @@ class Operation:
         self.blocks_img = np.array(self.blocks_img)[:,:3]
         print(self.blocks_img)
         
-        self.key_li = ['z', 'x', 'left', 'right', 'down', 'g']  # 조작키 리스트(g키는 기능이 없는 키)
+        self.key_li = ['z', 'x', 'left', 'right', 'down']  # , 'g']  # 조작키 리스트(g키는 기능이 없는 키)
         self.push_t = np.random.normal(0.5, 1, 1000)
         self.push_t = self.push_t[self.push_t > 0]  # 조작키를 누르는 시간(정규분포(0이하의 값들은 버림))
         
@@ -250,15 +250,22 @@ class Operation:
         _press('enter', 0)  # 게임 시작
         _press('enter', 0)  # 일시정지
         sleep(1)
-        print("%s\t\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ('현재 시각', '현재 점수', '현재 레벨', '현재 부순 줄', '방금 누른 키', '키를 누른 시간',
-                                                            '다음 블록', '계산 시간', '캡쳐 시간'))
+        print("%11s %5s %3s %4s %5s %5s %5s %5s %5s %50s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
+                                                                              'z', 'x', 'left', 'right', 'down',
+                                                                              'push_t', 'p', 'tForCal', 'tForCap', 'tForPus'))
         key = None
-        push_t = None
+        key_li = []
+        key_bool_li = []
+        # push_t = None
+        push_t_li = []
         current_clock = None
         # screenshots = []
         self.info_li = []
+        # bool_li = [True, False]
+        is_push = None
         t1, t2 = None, None
         t3, t4 = None, None
+        t5, t6 = None, None
         ############################################################################################################
         #=========================================================================================================
         _press('enter', 0)  # 일시정지 해제
@@ -269,17 +276,27 @@ class Operation:
         while True:
             t3 = clock()
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
-            t4 = clock()
             # screenshots.append(self.full_screenshot)
             if (np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1])):
                 self.end_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
                 self.end_game_clock = clock()
                 break
+            t4 = clock()
             
-            key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
-            push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
+            t5 = clock()            
+            # key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
+            # push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
             current_clock = clock()  # 현재 시각을 저장함
-            Thread(target=_press, args=(key, push_t,)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
+            key_bool_li = []
+            push_t_li = []
+            for key in self.key_li:
+                is_push = random() < 0.05 # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
+                key_bool_li.append(is_push) # 눌린 키를 저장함
+                if is_push:
+                    # key_li.append(key)
+                    push_t_li.append(choice(self.push_t))
+                    Thread(target=_press, args=(key, push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
+            t6 = clock()
             
             t1 = clock()
             self.score = self.check_score()
@@ -291,13 +308,17 @@ class Operation:
                              'score':self.score,
                              'level':self.level,
                              'line':self.line,
-                             'key':key,
-                             'push_t':push_t,
+                             'key':key_bool_li,
+                             'push_t':push_t_li,
                              'next_piece':self.next_piece,
                              'screenshot':self.full_screenshot})
             t2 = clock()
-            print("%.4f  \t%d\t%d\t%d\t%s\t%.6f\t%s\t%.5f\t%.6f" % (current_clock, self.score, self.level, self.line, key, push_t,
-                                                            self.next_piece, t2 - t1, t4 - t3))
+            # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
+            print("%11.5f %5d %3d %4d %5s %5s %5s %5s %5s %50s %1s %7.5f %7.5f %7.5f" % (current_clock, self.score, self.level,
+                                                                                         self.line, key_bool_li[0], key_bool_li[1],
+                                                                                         key_bool_li[2], key_bool_li[3],
+                                                                                         key_bool_li[4], push_t_li, self.next_piece,
+                                                                                         t2 - t1, t4 - t3, t6 - t5))
             # print(self.next_piece, t2 - t1)
             
         #=========================================================================================================
@@ -314,10 +335,11 @@ class Operation:
         print('게임 종료')
         
         print('데이터 저장 중', clock())
-        self.save_data()
+        # self.save_data()
         print('데이터 저장 완료', clock())
             
-        _press('left', 1)
+        _press('left', 0.1)
+        _press('left', 0.1)
             
         while not np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]):  # 로비로 나왔는지 확인함
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
