@@ -8,6 +8,7 @@ from PIL import Image
 from datetime import datetime
 from random import choice
 import _pyautogui_win as platformModule
+from threading import Thread
 try:
     from cx_Oracle import connect
 except Exception as e:
@@ -96,12 +97,12 @@ class Operation:
         for i in range(6):
             x1, y1 = 147 - 8 * i, 50
             x2, y2 = x1 + 7, y1 + 8
-            avg = np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2) # 스크린샷의 각 픽셀별 평균
-            bo = avg == self.number_font # 숫자 이미지의 픽셀값과 정확하게 일치하는 픽셀(각각의 숫자 이미지에 대한 값을 모두 구함)
-            bo = np.all(bo, axis=2) # 해당 줄의 픽셀값이 전부 같으면 True
-            bo = np.all(bo, axis=1) # 해당 열의 픽셀값이 전부 같으면 True
-            num = self.number_name[bo][0] # 최종적으로 픽셀값이 완전히 일치하는 숫자 이미지를 찾아냄
-            score += 10 ** i * num # 점수 더하기
+            avg = np.mean(self.full_screenshot[y1:y2, x1:x2], axis=2)  # 스크린샷의 각 픽셀별 평균
+            bo = avg == self.number_font  # 숫자 이미지의 픽셀값과 정확하게 일치하는 픽셀(각각의 숫자 이미지에 대한 값을 모두 구함)
+            bo = np.all(bo, axis=2)  # 해당 줄의 픽셀값이 전부 같으면 True
+            bo = np.all(bo, axis=1)  # 해당 열의 픽셀값이 전부 같으면 True
+            num = self.number_name[bo][0]  # 최종적으로 픽셀값이 완전히 일치하는 숫자 이미지를 찾아냄
+            score += 10 ** i * num  # 점수 더하기
         return score
     
     def check_level(self):
@@ -152,7 +153,7 @@ class Operation:
     
     def save_data(self):
         try:
-            con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip)) # db에 연결
+            con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip))  # db에 연결
             cur = con.cursor()
             
             sql = """
@@ -162,7 +163,7 @@ class Operation:
             # print(sql)
             cur.execute(sql)
             
-            con.commit() # 실제로 DB서버에 반영
+            con.commit()  # 실제로 DB서버에 반영
             
             sql = """
             select max(ng_no) from NotAI_game
@@ -209,7 +210,7 @@ class Operation:
         f.close()
         
         try:
-            con.commit() # 실제로 DB서버에 반영          
+            con.commit()  # 실제로 DB서버에 반영          
             con.close()
         except Exception as e:
             print('commit error :', e)
@@ -246,8 +247,8 @@ class Operation:
         # print(check_lobby)
             
         print('게임 시작')
-        _press('enter', 0) # 게임 시작
-        _press('enter', 0) # 일시정지
+        _press('enter', 0)  # 게임 시작
+        _press('enter', 0)  # 일시정지
         sleep(1)
         print("%s\t\t%s\t%s\t%s\t%s\t%s\t%s\t%s\t%s" % ('현재 시각', '현재 점수', '현재 레벨', '현재 부순 줄', '방금 누른 키', '키를 누른 시간',
                                                             '다음 블록', '계산 시간', '캡쳐 시간'))
@@ -260,7 +261,7 @@ class Operation:
         t3, t4 = None, None
         ############################################################################################################
         #=========================================================================================================
-        _press('enter', 0) # 일시정지 해제
+        _press('enter', 0)  # 일시정지 해제
         # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
         self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
         self.start_game_clock = clock()
@@ -275,10 +276,11 @@ class Operation:
                 self.end_game_clock = clock()
                 break
             
-            key = choice(self.key_li) # 누를키를 랜덤으로 선택함
-            push_t = choice(self.push_t) # 특정 키를 누를 시간을 선택함
-            current_clock = clock() # 현재 시각을 저장함
-            _press(key, push_t) # 특정 키를 일정 시간동안 누름
+            key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
+            push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
+            current_clock = clock()  # 현재 시각을 저장함
+            # _press(key, push_t) # 특정 키를 일정 시간동안 누름
+            Thread(target=_press, args=(key, push_t,)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
             
             t1 = clock()
             self.score = self.check_score()
@@ -296,7 +298,7 @@ class Operation:
                              'screenshot':self.full_screenshot})
             t2 = clock()
             print("%.4f  \t%d\t%d\t%d\t%s\t%.6f\t%s\t%.5f\t%.6f" % (current_clock, self.score, self.level, self.line, key, push_t,
-                                                            self.next_piece, t2-t1, t4-t3))
+                                                            self.next_piece, t2 - t1, t4 - t3))
             # print(self.next_piece, t2 - t1)
             
         #=========================================================================================================
@@ -449,6 +451,8 @@ def _Pooling(pool_x, pool_y, image):  # 최소 풀링 함수(풀링 필터의 �
     return image[0]
 
 
+# sleep중에 남은 sleep 시간보다 짧은 입력 명령이 들어온다면 어떻게 해야? -> 그냥 알아서 해결될듯
+# def th_press(key, s):
 def _press(key, s):  # key를 s초 동안 눌렀다가 뗌
     while True:
         # pyautogui._failSafeCheck()
@@ -486,6 +490,11 @@ def _full_screenshot(windows, npsw=True):
 
 
 if __name__ == '__main__':
+    #
+    # print(clock())
+    # _press('s', 0)
+    # print(clock())
+    
     oper = Operation()
     while True:
         oper.game()
