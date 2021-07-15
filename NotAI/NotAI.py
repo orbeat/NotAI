@@ -279,7 +279,6 @@ class Operation:
             key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
             push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
             current_clock = clock()  # 현재 시각을 저장함
-            # _press(key, push_t) # 특정 키를 일정 시간동안 누름
             Thread(target=_press, args=(key, push_t,)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
             
             t1 = clock()
