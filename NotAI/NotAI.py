@@ -250,8 +250,8 @@ class Operation:
         _press('enter', 0)  # 게임 시작
         _press('enter', 0)  # 일시정지
         sleep(1)
-        print("%11s %5s %3s %4s %5s %5s %5s %5s %5s %50s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
-                                                                              'z', 'x', 'left', 'right', 'down',
+        print("%11s %5s %3s %4s %s %s %s %s %s %70s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
+                                                                              'z', 'x', 'l', 'r', 'd',
                                                                               'push_t', 'p', 'tForCal', 'tForCap', 'tForPus'))
         key = None
         key_li = []
@@ -291,7 +291,7 @@ class Operation:
             push_t_li = []
             for key in self.key_li:
                 is_push = random() < 0.05 # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
-                key_bool_li.append(is_push) # 눌린 키를 저장함
+                key_bool_li.append(int(is_push)) # 눌린 키를 저장함
                 if is_push:
                     # key_li.append(key)
                     push_t_li.append(choice(self.push_t))
@@ -314,7 +314,7 @@ class Operation:
                              'screenshot':self.full_screenshot})
             t2 = clock()
             # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
-            print("%11.5f %5d %3d %4d %5s %5s %5s %5s %5s %50s %1s %7.5f %7.5f %7.5f" % (current_clock, self.score, self.level,
+            print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (current_clock, self.score, self.level,
                                                                                          self.line, key_bool_li[0], key_bool_li[1],
                                                                                          key_bool_li[2], key_bool_li[3],
                                                                                          key_bool_li[4], push_t_li, self.next_piece,
@@ -340,7 +340,8 @@ class Operation:
             
         _press('left', 0.1)
         _press('left', 0.1)
-            
+        
+        print('로비 대기', clock())
         while not np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]):  # 로비로 나왔는지 확인함
             self.full_screenshot = _full_screenshot(self.windows, npsw=True)
         
@@ -473,12 +474,14 @@ def _Pooling(pool_x, pool_y, image):  # 최소 풀링 함수(풀링 필터의 �
 
 
 # sleep중에 남은 sleep 시간보다 짧은 입력 명령이 들어온다면 어떻게 해야? -> 그냥 알아서 해결될듯
+# sleep중에 남은 sleep 시간보다 긴 입력 명령이 들어온다면 어떻게 해야? -> 중간에 끊김(그냥 놔둬도 괜찮을듯?)
 # def th_press(key, s):
 def _press(key, s):  # key를 s초 동안 눌렀다가 뗌
     while True:
         # pyautogui._failSafeCheck()
         try:
             # t1 = clock()
+            platformModule._keyUp(key) # 누르려는 키가 현재 눌려있는 경우를 대비
             platformModule._keyDown(key)
             # while True:
             sleep(s)
@@ -511,11 +514,6 @@ def _full_screenshot(windows, npsw=True):
 
 
 if __name__ == '__main__':
-    #
-    # print(clock())
-    # _press('s', 0)
-    # print(clock())
-    
     oper = Operation()
     while True:
         oper.game()
