@@ -486,7 +486,7 @@ def _press(key, s):  # key를 s초 동안 눌렀다가 뗌
         # pyautogui._failSafeCheck()
         try:
             # t1 = clock()
-            platformModule._keyUp(key) # 누르려는 키가 현재 눌려있는 경우를 대비
+            # platformModule._keyUp(key) # 누르려는 키가 현재 눌려있는 경우를 대비
             platformModule._keyDown(key)
             # while True:
             sleep(s)
