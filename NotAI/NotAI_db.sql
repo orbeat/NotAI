@@ -14,17 +14,17 @@ create table NotAI_Control2
 (
 	nc_no number(13) primary key,
 	--nc_push_key number(2) not null,			-- 누른 키
-	--nc_start_clock number(13,4) not null,		-- 누르기 시작한 시간
+	nc_start_clock number(13,4) not null,		-- 누르기 시작한 시간
 	--nc_control_time number(6,4) not null,		-- 누른 시간(값이 1.5면 1.5초동안 누름)
 	
 	-- 값이 0이면 눌리지 않은 키
-	nc_start_clock_z number(13,4) not null,		-- z키를 누르기 시작한 시간(clock())
-	nc_start_clock_x number(13,4) not null,		-- x키를 누르기 시작한 시간(clock())
-	nc_start_clock_left number(13,4) not null,	-- left키를 누르기 시작한 시간(clock())
-	nc_start_clock_right number(13,4) not null,	-- right키를 누르기 시작한 시간(clock())
-	nc_start_clock_down number(13,4) not null,	-- down키를 누르기 시작한 시간(clock())
+--	nc_start_clock_z number(13,4) not null,		-- z키를 누르기 시작한 시간(clock())
+--	nc_start_clock_x number(13,4) not null,		-- x키를 누르기 시작한 시간(clock())
+--	nc_start_clock_left number(13,4) not null,	-- left키를 누르기 시작한 시간(clock())
+--	nc_start_clock_right number(13,4) not null,	-- right키를 누르기 시작한 시간(clock())
+--	nc_start_clock_down number(13,4) not null,	-- down키를 누르기 시작한 시간(clock())
 	
-	-- 값이 0이면 눌리지 않은 키
+	-- 값이 0이어도 눌린 키 일수도 있음
 	nc_control_time_z number(6,4) not null,		-- z키를 누른 시간(값이 1.5면 1.5초동안 누름)
 	nc_control_time_x number(6,4) not null,		-- x키를 누른 시간(값이 1.5면 1.5초동안 누름)
 	nc_control_time_left number(6,4) not null,	-- left키를 누른 시간(값이 1.5면 1.5초동안 누름)
@@ -53,6 +53,9 @@ values (NotAI_Control_seq.nextval, 'x', 3.497611, 1.396458, 0, 0, 0, 'L', 13);
 
 insert into NotAI_Control2
 values (NotAI_Control_seq.nextval, 'right', 2.514763, 0.928671, 0, 0, 0, 'L', 13);
+
+insert into NotAI_Control2
+values (NotAI_Control_seq.nextval, 4.2636, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0, 0, 0, 'T', 8);
 
 select * from NotAI_game2;
 select * from NotAI_control2;

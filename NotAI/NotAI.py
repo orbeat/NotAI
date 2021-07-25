@@ -77,7 +77,7 @@ class Operation:
         
         self.key_li = ['z', 'x', 'left', 'right', 'down']  # , 'g']  # 조작키 리스트(g키는 기능이 없는 키)
         self.push_t = np.random.normal(0.5, 1, 1000)
-        self.push_t = self.push_t[self.push_t > 0]  # 조작키를 누르는 시간(정규분포(0이하의 값들은 버림))
+        self.push_t = self.push_t[(self.push_t > 0) & (self.push_t < 100)]  # 조작키를 누르는 시간(정규분포(0이하의 값과 100을 초과하는 값들은 버림))
         
         self.windows = None
         self.full_screenshot = None
@@ -157,16 +157,17 @@ class Operation:
             cur = con.cursor()
             
             sql = """
-            insert into NotAI_game
-            values (NotAI_game_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
+            insert into NotAI_game2
+            values (NotAI_game2_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
             """ % (self.start_game_time, self.start_game_clock, self.end_game_time, self.end_game_clock)
             # print(sql)
             cur.execute(sql)
             
             con.commit()  # 실제로 DB서버에 반영
             
+            # 가장 최근에 진행한 게임 번호를 받아옴
             sql = """
-            select max(ng_no) from NotAI_game
+            select max(ng_no) from NotAI_game2
             """
             # print(sql)
             cur.execute(sql)
@@ -179,7 +180,7 @@ class Operation:
         except Exception as e:
             print('DB저장 실패', e)
         
-        _dir = r'\orbeat\NotAI\data\img\%s_%.6f' % (self.start_game_time, self.start_game_clock)
+        _dir = r'\orbeat\NotAI\data\img\%s_%.4f' % (self.start_game_time, self.start_game_clock)
         createFolder(_dir)
         
         #          게임 시작 시간             _시작 클럭      조작 시작 시각        _조작 시간                
@@ -189,23 +190,25 @@ class Operation:
         # 추후 OracleDB에 바로 저장하도록 바꾸기(스크린샷은 그대로 폴더에 저장)
         
         createFolder(r'\orbeat\NotAI\data\log')
-        f = open(r'\orbeat\NotAI\data\log\%s_%.6f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
+        f = open(r'\orbeat\NotAI\data\log\%s_%.4f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
         for i, v in enumerate(self.info_li):
-            _path = _dir + r'\%.6f_%.6f_%s.png' % (v['current_clock'], v['push_t'], v['key'])
+            _path = _dir + r'\%.4f.png' % (v['current_clock'])#, v['push_t'], v['key']) # 이미지의 경로
             Image.fromarray(v['screenshot'], 'RGB').save(_path)
             
-            f.write('%.6f\t%.6f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
+            f.write('%.4f\t%s\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
                                                           , v['score'], v['level'], v['line'], v['next_piece']))
             
             try:
+                # print(v)
                 sql = """
-                insert into NotAI_Control
-                values (NotAI_Control_seq.nextval, '%s', %.6f, %.6f, %d, %d, %d, '%s', %d)
-                """ % (v['key'], v['current_clock'], v['push_t'], v['score'], v['level'], v['line'], v['next_piece'], ng_no)
+                insert into NotAI_Control2
+                values (NotAI_Control2_seq.nextval, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %d, %d, %d, '%s', %d)
+                """ % (v['current_clock'], v['push_t'][0], v['push_t'][1], v['push_t'][2], v['push_t'][3], v['push_t'][4],
+                       v['score'], v['level'], v['line'], v['next_piece'], ng_no)
                 # print(sql)
                 cur.execute(sql)
             except Exception as e:
-                print('DB 저장 실패', e)
+                print('DB 저장 실패 :', e)
             
         f.close()
         
@@ -294,8 +297,10 @@ class Operation:
                 key_bool_li.append(int(is_push)) # 눌린 키를 저장함
                 if is_push:
                     # key_li.append(key)
-                    push_t_li.append(choice(self.push_t))
+                    push_t_li.append(choice(self.push_t)) # 누르는 시간을 랜덤 선택함
                     Thread(target=_press, args=(key, push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
+                else:
+                    push_t_li.append(0) # 키가 눌리지 않음
             t6 = clock()
             
             t1 = clock()
@@ -335,7 +340,7 @@ class Operation:
         print('게임 종료')
         
         print('데이터 저장 중', clock())
-        # self.save_data()
+        self.save_data()
         print('데이터 저장 완료', clock())
             
         _press('left', 0.1)
