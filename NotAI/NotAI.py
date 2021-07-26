@@ -218,6 +218,76 @@ class Operation:
         except Exception as e:
             print('commit error :', e)
     
+    def game_frame(self, control_switch=True):
+        self.t3 = clock()
+        self.full_screenshot = _full_screenshot(self.windows, npsw=True)
+        # screenshots.append(self.full_screenshot)
+        check1 = np.all(self.full_screenshot[self.c_y1:self.c_y2, self.c_x1:self.c_x2] == self.check_game_over_img)
+        check2 = np.all(self.full_screenshot[self.c_y1:self.c_y2, self.c_x1:self.c_x2] == self.check_lobby_img[0])
+        check3 = np.all(self.full_screenshot[self.c_y1:self.c_y2, self.c_x1:self.c_x2] == self.check_lobby_img[1])
+        if check1 or check2 or check3:
+            self.end_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
+            self.end_game_clock = clock()
+            return False
+        self.t4 = clock()
+        
+        self.t5 = clock()            
+        # key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
+        # push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
+        self.current_clock = clock()  # 현재 시각을 저장함
+        self.key_bool_li = []
+        self.push_t_li = []
+        for key in self.key_li:
+            self.is_push = (random() < 0.05) & control_switch # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
+            self.key_bool_li.append(int(self.is_push)) # 눌린 키를 저장함
+            if self.is_push:
+                # key_li.append(key)
+                self.push_t_li.append(choice(self.push_t)) # 누르는 시간을 랜덤 선택함
+                Thread(target=_press, args=(key, self.push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
+            else:
+                self.push_t_li.append(0) # 키가 눌리지 않음
+        self.t6 = clock()
+        
+        self.t1 = clock()
+        self.score = self.check_score()
+        self.level = self.check_level()
+        self.line = self.check_line()
+        self.next_piece = self.check_block()[0]
+        
+        self.info_li.append({'current_clock':self.current_clock,
+                         'score':self.score,
+                         'level':self.level,
+                         'line':self.line,
+                         'key':self.key_bool_li,
+                         'push_t':self.push_t_li,
+                         'next_piece':self.next_piece,
+                         'screenshot':self.full_screenshot})
+        self.t2 = clock()
+        # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
+        print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
+                                                                                     self.line, self.key_bool_li[0],
+                                                                                     self.key_bool_li[1], self.key_bool_li[2],
+                                                                                     self.key_bool_li[3], self.key_bool_li[4],
+                                                                                     self.push_t_li, self.next_piece,
+                                                                                     self.t2 - self.t1, self.t4 - self.t3,
+                                                                                     self.t6 - self.t5))
+        # print(self.next_piece, t2 - t1)
+        # while True:
+        self.game_time = clock() - self.start_game_clock # 게임이 시작하고 나서 지난 시간
+        self.delay = self.second_per_frame * self.cnt - self.game_time # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
+        # print(cnt, game_time, delay)
+        if self.delay >= 0:
+            sleep(self.delay)
+            # continue
+        elif self.delay > -1:
+            pass
+            # break
+        else:
+            print("너무 느린 실행 속도")
+            exit()
+        self.cnt += 1
+        return True
+    
     def game(self):
         print('창 위치 확인')
         self.windows = window_info('Not Tetris 2')
@@ -235,6 +305,7 @@ class Operation:
             
         print('준비중...')
         c_x1, c_x2, c_y1, c_y2 = 28, 92, 46, 75
+        self.c_x1, self.c_x2, self.c_y1, self.c_y2 = c_x1, c_x2, c_y1, c_y2
         self.check_lobby_img = [np.array(pilimg.open(r'img\check_lobby1.png'))[c_y1:c_y2, c_x1:c_x2],
                        np.array(pilimg.open(r'img\check_lobby2.png'))[c_y1:c_y2, c_x1:c_x2]]
         self.check_lobby = [False, False]
@@ -257,22 +328,22 @@ class Operation:
                                                                               'z', 'x', 'l', 'r', 'd',
                                                                               'push_t', 'p', 'tForCal', 'tForCap', 'tForPus'))
         key = None
-        key_li = []
-        key_bool_li = []
+        # self.key_li = []
+        self.key_bool_li = []
         # push_t = None
-        push_t_li = []
-        current_clock = None
+        self.push_t_li = []
+        self.current_clock = None
         # screenshots = []
         self.info_li = []
         # bool_li = [True, False]
-        is_push = None
-        cnt = 1 # 반복 횟수
-        game_time = None
-        fps = 10
-        second_per_frame = 1/fps # 1초에 fps번 캡쳐 (및 조작)
-        t1, t2 = None, None
-        t3, t4 = None, None
-        t5, t6 = None, None
+        self.is_push = None
+        self.cnt = 1 # 반복 횟수
+        self.game_time = None
+        self.fps = 10
+        self.second_per_frame = 1/self.fps # 1초에 fps번 캡쳐 (및 조작)
+        self.t1, self.t2 = None, None
+        self.t3, self.t4 = None, None
+        self.t5, self.t6 = None, None
         ############################################################################################################
         #=========================================================================================================
         _press('enter', 0)  # 일시정지 해제
@@ -280,73 +351,17 @@ class Operation:
         self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
         self.start_game_clock = clock()
         # print(self.start_game_clock)
-        while True:
-            t3 = clock()
-            self.full_screenshot = _full_screenshot(self.windows, npsw=True)
-            # screenshots.append(self.full_screenshot)
-            if (np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]) or np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1])):
-                self.end_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
-                self.end_game_clock = clock()
-                break
-            t4 = clock()
+        for i in range(3): # DQN에 넣을 이미지를 캡쳐함
+            self.game_frame(control_switch=False)
             
-            t5 = clock()            
-            # key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
-            # push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
-            current_clock = clock()  # 현재 시각을 저장함
-            key_bool_li = []
-            push_t_li = []
-            for key in self.key_li:
-                is_push = random() < 0.05 # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
-                key_bool_li.append(int(is_push)) # 눌린 키를 저장함
-                if is_push:
-                    # key_li.append(key)
-                    push_t_li.append(choice(self.push_t)) # 누르는 시간을 랜덤 선택함
-                    Thread(target=_press, args=(key, push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
-                else:
-                    push_t_li.append(0) # 키가 눌리지 않음
-            t6 = clock()
-            
-            t1 = clock()
-            self.score = self.check_score()
-            self.level = self.check_level()
-            self.line = self.check_line()
-            self.next_piece = self.check_block()[0]
-            
-            self.info_li.append({'current_clock':current_clock,
-                             'score':self.score,
-                             'level':self.level,
-                             'line':self.line,
-                             'key':key_bool_li,
-                             'push_t':push_t_li,
-                             'next_piece':self.next_piece,
-                             'screenshot':self.full_screenshot})
-            t2 = clock()
-            # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
-            print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (current_clock, self.score, self.level,
-                                                                                         self.line, key_bool_li[0], key_bool_li[1],
-                                                                                         key_bool_li[2], key_bool_li[3],
-                                                                                         key_bool_li[4], push_t_li, self.next_piece,
-                                                                                         t2 - t1, t4 - t3, t6 - t5))
-            # print(self.next_piece, t2 - t1)
-            # while True:
-            game_time = clock() - self.start_game_clock # 게임이 시작하고 나서 지난 시간
-            delay = second_per_frame * cnt - game_time # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
-            # print(cnt, game_time, delay)
-            if delay >= 0:
-                sleep(delay)
-                # continue
-            elif delay > -1:
-                pass
-                # break
-            else:
-                print("너무 느린 실행 속도")
-                exit()
-            cnt += 1
+        while self.game_frame(control_switch=True):
+            pass
         #=========================================================================================================
         ############################################################################################################
                 
-        print(np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img), np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]), np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1]))
+        print(np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img),
+              np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]),
+              np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[1]))
         
         if np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_game_over_img):
             self.score = self.check_score()
