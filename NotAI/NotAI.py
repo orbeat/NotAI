@@ -75,7 +75,28 @@ class Operation:
         self.blocks_img = np.array(self.blocks_img)[:,:3]
         print(self.blocks_img)
         
-        self.key_li = ['z', 'x', 'left', 'right', 'down']  # , 'g']  # 조작키 리스트(g키는 기능이 없는 키)
+        self.key_li = [['', 'z', 'x'], ['', 'left', 'right'], ['', 'down']] # 조작키 리스트(각각의 리스트에서는 한개의 키만 선택됨)
+        # self.key_li = [['z', 'x'], ['left', 'right'], ['down']] # 조작키 리스트(각각의 리스트에서는 한개의 키만 선택됨)
+        combination = 1 # 경우의 수(조합)계산
+        for i in self.key_li:
+            combination *= len(i)
+        print(combination)
+        
+        self.number2key_li = []
+        for i in range(combination):
+            self.number2key_li.append(self.number2key_bool_li(combination, i))
+            # print(i)
+            # print(self.number2key_bool_li(combination, i))
+
+        # for i in self.number2key_li:
+            # print(i)
+        # exit()
+        self.key_li2 = []
+        for i in self.key_li:
+            for j in i:
+                if j=='': continue
+                self.key_li2.append(j)
+        
         self.push_t = np.random.normal(0.5, 1, 1000)
         self.push_t = self.push_t[(self.push_t > 0) & (self.push_t < 100)]  # 조작키를 누르는 시간(정규분포(0이하의 값과 100을 초과하는 값들은 버림))
         
@@ -85,6 +106,24 @@ class Operation:
         self.score, self.level, self.line = None, None, None
         self.next_piece = None
         self.info_li = []
+    
+    def number2key_bool_li(self, combination, number):
+        push_key = []
+        # n = 0
+        for i in self.key_li:
+            combination //= len(i)   # 해당 자리의 값을 구함
+            n = number // combination
+            # print(combination, number, i, n)
+            push_key.append(i[n])
+            number -= n*combination
+        
+        bool_li = []
+        for i in self.key_li:
+            for j in i:
+                if j=='': continue
+                bool_li.append(j in push_key)
+        
+        return bool_li
     
     def avg_RGB(self, img):  # 해당 이미지에서 완전한 흰색(배경)을 제외한 RGB값의 평균을 반환함
         img = img[np.any(img[:,:,:3] != np.array([255, 255, 255]), axis=2)]  # 배경색([255,255,255]) 제외
@@ -157,8 +196,8 @@ class Operation:
             cur = con.cursor()
             
             sql = """
-            insert into NotAI_game2
-            values (NotAI_game2_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
+            insert into NotAI_game3
+            values (NotAI_game3_seq.nextval, to_date('%s', 'YYYYMMDD-HH24MISS'), %s, to_date('%s', 'YYYYMMDD-HH24MISS'), %s)
             """ % (self.start_game_time, self.start_game_clock, self.end_game_time, self.end_game_clock)
             # print(sql)
             cur.execute(sql)
@@ -167,7 +206,7 @@ class Operation:
             
             # 가장 최근에 진행한 게임 번호를 받아옴
             sql = """
-            select max(ng_no) from NotAI_game2
+            select max(ng_no) from NotAI_game3
             """
             # print(sql)
             cur.execute(sql)
@@ -192,18 +231,17 @@ class Operation:
         createFolder(r'\orbeat\NotAI\data\log')
         f = open(r'\orbeat\NotAI\data\log\%s_%.4f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
         for i, v in enumerate(self.info_li):
-            _path = _dir + r'\%.4f.png' % (v['current_clock'])#, v['push_t'], v['key']) # 이미지의 경로
+            _path = _dir + r'\%.4f_%s.png' % (v['current_clock'], v['key'])# 이미지의 경로
             Image.fromarray(v['screenshot'], 'RGB').save(_path)
             
-            f.write('%.4f\t%s\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['push_t'], v['key']
-                                                          , v['score'], v['level'], v['line'], v['next_piece']))
+            f.write('%.4f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['key'], v['score'], v['level'], v['line'], v['next_piece']))
             
             try:
                 # print(v)
                 sql = """
-                insert into NotAI_Control2
-                values (NotAI_Control2_seq.nextval, %.4f, %.4f, %.4f, %.4f, %.4f, %.4f, %d, %d, %d, '%s', %d)
-                """ % (v['current_clock'], v['push_t'][0], v['push_t'][1], v['push_t'][2], v['push_t'][3], v['push_t'][4],
+                insert into NotAI_Control3
+                values (NotAI_Control3_seq.nextval, %.4f, %d, %d, %d, %d, %d, %d, %d, %d, '%s', %d)
+                """ % (v['current_clock'], v['key'][0], v['key'][1], v['key'][2], v['key'][3], v['key'][4],
                        v['score'], v['level'], v['line'], v['next_piece'], ng_no)
                 # print(sql)
                 cur.execute(sql)
@@ -235,17 +273,29 @@ class Operation:
         # key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
         # push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
         self.current_clock = clock()  # 현재 시각을 저장함
+        # self.key_bool_li = []
+        # self.push_t_li = []
+        # for key in self.key_li:
+            # self.is_push = (random() < 0.05) & control_switch # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
+            # self.key_bool_li.append(int(self.is_push)) # 눌린 키를 저장함
+            # if self.is_push:
+                # # key_li.append(key)
+                # self.push_t_li.append(choice(self.push_t)) # 누르는 시간을 랜덤 선택함
+                # Thread(target=_press, args=(key, self.push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
+            # else:
+                # self.push_t_li.append(0) # 키가 눌리지 않음
         self.key_bool_li = []
-        self.push_t_li = []
-        for key in self.key_li:
-            self.is_push = (random() < 0.05) & control_switch # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
-            self.key_bool_li.append(int(self.is_push)) # 눌린 키를 저장함
-            if self.is_push:
-                # key_li.append(key)
-                self.push_t_li.append(choice(self.push_t)) # 누르는 시간을 랜덤 선택함
-                Thread(target=_press, args=(key, self.push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
-            else:
-                self.push_t_li.append(0) # 키가 눌리지 않음
+        try:
+            # for i, v in enumerate(self.number2key_li[1]):
+            for i, v in enumerate(choice(self.number2key_li)):
+                if v and control_switch:
+                    self.key_bool_li.append(1)
+                    platformModule._keyDown(self.key_li2[i])
+                else:
+                    self.key_bool_li.append(0)
+                    platformModule._keyUp(self.key_li2[i])
+        except Exception as e:
+            print('에러 발생 :', e)
         self.t6 = clock()
         
         self.t1 = clock()
@@ -259,16 +309,18 @@ class Operation:
                          'level':self.level,
                          'line':self.line,
                          'key':self.key_bool_li,
-                         'push_t':self.push_t_li,
+                         # 'push_t':self.push_t_li,
                          'next_piece':self.next_piece,
                          'screenshot':self.full_screenshot})
         self.t2 = clock()
         # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
-        print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
+        # print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
+        print("%11.4f %5d %3d %4d %d %d %d %d %d %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
                                                                                      self.line, self.key_bool_li[0],
                                                                                      self.key_bool_li[1], self.key_bool_li[2],
                                                                                      self.key_bool_li[3], self.key_bool_li[4],
-                                                                                     self.push_t_li, self.next_piece,
+                                                                                     # self.push_t_li,
+                                                                                     self.next_piece,
                                                                                      self.t2 - self.t1, self.t4 - self.t3,
                                                                                      self.t6 - self.t5))
         # print(self.next_piece, t2 - t1)
@@ -324,9 +376,12 @@ class Operation:
         _press('enter', 0)  # 게임 시작
         _press('enter', 0)  # 일시정지
         sleep(1)
-        print("%11s %5s %3s %4s %s %s %s %s %s %70s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
+        # print("%11s %5s %3s %4s %s %s %s %s %s %70s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
+                                                                              # 'z', 'x', 'l', 'r', 'd',
+                                                                              # 'push_t', 'p', 'tForCal', 'tForCap', 'tForPus'))
+        print("%11s %5s %3s %4s %s %s %s %s %s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
                                                                               'z', 'x', 'l', 'r', 'd',
-                                                                              'push_t', 'p', 'tForCal', 'tForCap', 'tForPus'))
+                                                                              'p', 'tForCal', 'tForCap', 'tForPus'))
         key = None
         # self.key_li = []
         self.key_bool_li = []
@@ -367,7 +422,13 @@ class Operation:
             self.score = self.check_score()
             self.level = self.check_level()
             self.line = self.check_line()
-            print(self.score, self.level, self.line) 
+            print(self.score, self.level, self.line)
+        
+        try:
+            for i in self.key_li2:
+                platformModule._keyUp(i)
+        except Exception as e:
+            print('에러 발생3 :', e)
             
         print('게임 종료')
         
