@@ -266,6 +266,10 @@ class Operation:
         self.info_li = []
         # bool_li = [True, False]
         is_push = None
+        cnt = 1 # 반복 횟수
+        game_time = None
+        fps = 10
+        second_per_frame = 1/fps # 1초에 fps번 캡쳐 (및 조작)
         t1, t2 = None, None
         t3, t4 = None, None
         t5, t6 = None, None
@@ -325,7 +329,20 @@ class Operation:
                                                                                          key_bool_li[4], push_t_li, self.next_piece,
                                                                                          t2 - t1, t4 - t3, t6 - t5))
             # print(self.next_piece, t2 - t1)
-            
+            # while True:
+            game_time = clock() - self.start_game_clock # 게임이 시작하고 나서 지난 시간
+            delay = second_per_frame * cnt - game_time # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
+            # print(cnt, game_time, delay)
+            if delay >= 0:
+                sleep(delay)
+                # continue
+            elif delay > -1:
+                pass
+                # break
+            else:
+                print("너무 느린 실행 속도")
+                exit()
+            cnt += 1
         #=========================================================================================================
         ############################################################################################################
                 
