@@ -54,7 +54,7 @@ class Operation:
             # print(files)
             for _, v in enumerate(files):
                 # print(targetdir + '\\' + v)
-                self.block_data.append(_Pooling(self.POOLING_X, self.POOLING_Y,
+                self.block_data.append(_pooling(self.POOLING_X, self.POOLING_Y,
                                                 np.array(pilimg.open(r'img\rotation\%s\%s' % (v1, v)))[:,:,:3]))
                 self.block_data_label.append(v1)
                 
@@ -81,6 +81,7 @@ class Operation:
         for i in self.key_li:
             combination *= len(i)
         print(combination)
+        self.nbActions = combination
         
         self.number2key_li = []
         for i in range(combination):
@@ -124,6 +125,20 @@ class Operation:
                 bool_li.append(j in push_key)
         
         return bool_li
+    
+    def key_bool_li2number(self, combination, key_bool_li):
+        jali_li = []
+        for i in self.key_li:
+            combination //= len(i)   # 해당 자리의 값을 구함
+            for j in range(len(i)):
+                if j==0: continue
+                jali_li.append(j*combination)
+        jali_li = np.array(jali_li)
+        # print(jali_li)
+        # print(key_bool_li)
+        # print(jali_li[np.array(key_bool_li)==1])
+            
+        return np.sum(jali_li[np.array(key_bool_li)==1])
     
     def avg_RGB(self, img):  # 해당 이미지에서 완전한 흰색(배경)을 제외한 RGB값의 평균을 반환함
         img = img[np.any(img[:,:,:3] != np.array([255, 255, 255]), axis=2)]  # 배경색([255,255,255]) 제외
@@ -182,7 +197,7 @@ class Operation:
         return  np.arange(1, 8)[bo]
     
     def check_block(self):
-        pool_img = _Pooling(self.POOLING_X, self.POOLING_Y, self.full_screenshot[129:162, 122:155])
+        pool_img = _pooling(self.POOLING_X, self.POOLING_Y, self.full_screenshot[129:162, 122:155])
         
         cha = np.abs(self.block_data - pool_img)
         # print(cha.shape)
@@ -436,8 +451,10 @@ class Operation:
         self.save_data()
         print('데이터 저장 완료', clock())
             
-        _press('left', 0.1)
-        _press('left', 0.1)
+        _press('left', 0.5)
+        _press('down', 0.5)
+        _press('left', 0.5)
+        _press('down', 0.5)
         
         print('로비 대기', clock())
         while not np.all(self.full_screenshot[c_y1:c_y2, c_x1:c_x2] == self.check_lobby_img[0]):  # 로비로 나왔는지 확인함
@@ -534,11 +551,12 @@ def im2col(input_data, filter_h, filter_w, stride=1, pad=0):
 
 class Pooling:  # 출처 : 밑바닥부터 시작하는 딥러닝(249p)
 
-    def __init__(self, pool_h, pool_w, stride=1, pad=0):
+    def __init__(self, pool_h, pool_w, stride=1, pad=0, min_sw=True):
         self.pool_h = pool_h
         self.pool_w = pool_w
         self.stride = stride
         self.pad = pad
+        self.min_sw = min_sw
 
     def forward(self, x):
         N, C, H, W = x.shape
@@ -549,8 +567,9 @@ class Pooling:  # 출처 : 밑바닥부터 시작하는 딥러닝(249p)
         col = im2col(x, self.pool_h, self.pool_w, self.stride, self.pad)
         col = col.reshape(-1, self.pool_h * self.pool_w)
 
-        # 최소값(2)
-        out = np.min(col, axis=1)
+        # 최소(대)값(2)
+        if self.min_sw: out = np.min(col, axis=1)
+        else: out = np.max(col, axis=1)
 
         # 성형 (3)
         out = out.reshape(N, out_h, out_w, C).transpose(0, 3, 1, 2)
@@ -558,13 +577,13 @@ class Pooling:  # 출처 : 밑바닥부터 시작하는 딥러닝(249p)
         return out
 
 
-def _Pooling(pool_x, pool_y, image):  # 최소 풀링 함수(풀링 필터의 가로 세로 크기와 이미지를 받아 풀링된 값을 반환함)
+def _pooling(pool_x, pool_y, image, min_sw=True):  # 풀링 함수(풀링 필터의 가로 세로 크기와 이미지를 받아 풀링된 값을 반환함)
     temp = []
     temp.append(image[:,:, 0:3])
     image = np.array(temp)
     image = image.transpose(0, 3, 1, 2)
         
-    __pooling = Pooling(pool_h=pool_y, pool_w=pool_x, stride=pool_x)
+    __pooling = Pooling(pool_h=pool_y, pool_w=pool_x, stride=pool_x, min_sw=min_sw)
     image = __pooling.forward(image)
     image = image.transpose(0, 2, 3, 1)
 

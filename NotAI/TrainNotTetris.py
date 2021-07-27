@@ -15,8 +15,15 @@ import random
 import math
 import os
 from time import perf_counter as clock
+from cx_Oracle import connect
+from datetime import datetime
+import PIL.Image as pilimg
+import NotAI
+from PIL import Image
+import cv2
+import matplotlib.pyplot as plt
 
-tf.compat.v1.disable_eager_execution()  # 출처: https://luvstudy.tistory.com/122 [파란하늘의 지식창고]
+tf2.disable_eager_execution()
 
 # Parameters
 
@@ -30,17 +37,18 @@ epsilonMinimumValue = 0.001
 
 # The number of actions. Since we only have left/stay/right that means 3 actions.
 # 작업 수입니다. 왼쪽/머무름/오른쪽만 있으므로 3가지 동작을 의미합니다.
-nbActions = 3
-epoch = 10001  # The number of games we want the system to run for.
-hiddenSize = 100  # Number of neurons in the hidden layers.
+nbActions = 18  # [['', 'z', 'x'], ['', 'left', 'right'], ['', 'down']]의 조합
+epoch = 1+1  # The number of games we want the system to run for.
+hiddenSize = 1000  # Number of neurons in the hidden layers.
 maxMemory = 500  # 메모리의 크기(과거 경험을 저장하는 위치).
 
 # The mini-batch size for training. Samples are randomly taken from memory till mini-batch size.
 # 훈련용 미니 배치 크기. 샘플은 미니 배치 크기까지 메모리에서 무작위로 가져옵니다.
 batchSize = 50
 
-gridSize = 10  # 게임 화면 크기
-nbStates = gridSize * gridSize  # We eventually flatten to a 1d tensor to feed the network.
+gridSize_x = 96#24  # 게임 화면 크기(가로)
+gridSize_y = 144#42  # 게임 화면 크기(세로)
+nbStates = gridSize_x * gridSize_y  # We eventually flatten to a 1d tensor to feed the network.
 discount = 0.9  # 할인은 네트워크가 보상을 더 빨리 받을 수 있는 상태를 선택하도록 하는 데 사용됩니다(0에서 1).
 learningRate = 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
 
@@ -74,12 +82,14 @@ def randf(s, e):
 
 
 # The environment: Handles interactions and contains the state of the environment
+# 환경: 상호작용을 처리하고 환경의 상태를 포함합니다.
 class CatchEnvironment():
 
-    def __init__(self, gridSize):
-        self.gridSize = gridSize
-        self.nbStates = self.gridSize * self.gridSize  # 판의 넓이(정사각형)
-        self.state = np.empty(3, dtype=np.uint8)  # 빈 공간 3개 생성(왼쪽, 정지, 오른쪽 인듯?)
+    def __init__(self, gridSize_x, gridSize_y):
+        self.gridSize_x = gridSize_x
+        self.gridSize_y = gridSize_y
+        self.nbStates = self.gridSize_x * self.gridSize_y  # 판의 넓이(직사각형)
+        self.state = np.empty(3, dtype=np.uint8)  # 빈 공간 3개 생성(상태 저장)
 
     # Returns the state of the environment.
     def observe(self):
@@ -88,7 +98,7 @@ class CatchEnvironment():
         return canvas
 
     def drawState(self):
-        canvas = np.zeros((self.gridSize, self.gridSize))
+        canvas = np.zeros((self.gridSize_x, self.gridSize_y))
         canvas[self.state[0] - 1, self.state[1] - 1] = 1  # Draw the fruit.
         # Draw the basket. The basket takes the adjacent two places to the position of basket.
         canvas[self.gridSize - 1, self.state[2] - 1 - 1] = 1
@@ -152,18 +162,114 @@ class CatchEnvironment():
         return self.observe(), reward, gameOver, self.getState()  # For purpose of the visual, I also return the state.
 
 
+class NotTetris2:
+
+    def __init__(self, x1, y1, x2, y2, db='choi', db_name='choi', ip='localhost'):
+        self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2  # 불러올 이미지 영역
+        self.db = db
+        self.db_name = db_name
+        self.ip = ip
+        
+        self.oper = NotAI.Operation()
+        # print('n :', self.oper.key_bool_li2number(self.oper.nbActions, [0,1,0,1,0]))
+        # print(self.oper.nbActions)
+    
+    def load_game(self, nc_ng_no):
+        try:
+            con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip))  # db에 연결
+            cur = con.cursor()
+            
+            sql = """
+            select *
+            from NotAI_game3
+            where ng_no = %d
+            """ % nc_ng_no
+            # print(sql)
+            cur.execute(sql)
+            
+            self.game_info = None
+            for i in cur:
+                # print(i)
+                self.game_info = {
+                    'start_game_time':datetime.strftime(i[1], '%Y%m%d-%H%M%S'),
+                    'start_game_clock':i[2],
+                    'end_game_time':datetime.strftime(i[3], '%Y%m%d-%H%M%S'),
+                    'end_game_clock':i[4]
+                    }
+            
+            print(nc_ng_no, self.game_info)
+            
+            con.close()
+            
+            _dir = r'\orbeat\NotAI\data\img\%s_%.4f' % (self.game_info['start_game_time'], self.game_info['start_game_clock'])
+            
+            con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip))  # db에 연결
+            cur = con.cursor()
+            
+            sql = """
+            select *
+            from NotAI_Control3
+            where nc_ng_no = %d
+            order by nc_no
+            """ % nc_ng_no
+            # print(sql)
+            cur.execute(sql)
+            
+            self.frames = []
+            for i in cur:
+                # print(i)
+                self.frames.append({
+                    'nc_no':i[0],
+                    'current_clock':i[1],
+                    'z':i[2],
+                    'x':i[3],
+                    'left':i[4],
+                    'right':i[5],
+                    'down':i[6],
+                    'score':i[7],
+                    'level':i[8],
+                    'line':i[9],
+                    'next_block':i[10],
+                    })
+                key_bool_li = [i[2], i[3], i[4], i[5], i[6]]
+                img_path = _dir + '\\%.4f_%s.png' % (i[1], key_bool_li)
+                self.frames[-1]['key'] = self.oper.key_bool_li2number(self.oper.nbActions, key_bool_li)
+                # print(self.frames[-1])
+                self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)#pilimg.open(img_path)
+                self.frames[-1]['screenshot'] = cv2.cvtColor(self.frames[-1]['screenshot'], cv2.COLOR_BGR2RGB)
+                # self.frames[-1]['screenshot'].show()
+                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2+1, self.x1:self.x2+1, 0].flatten()
+                # self.frames[-1]['screenshot'] = np.array(self.frames[-1]['screenshot'])[self.y1:self.y2+1, self.x1:self.x2+1]
+                # print(self.frames[-1]['screenshot'])
+                # plt.imshow(self.frames[-1]['screenshot'])
+                # plt.show()
+                
+                # Image.fromarray(self.frames[-1]['screenshot'], 'RGB').show()
+                # exit()
+                
+            
+        except Exception as e:
+            print('DB불러오기 실패', e)
+            
+        try:
+            con.close()
+        except Exception as e:
+            print('DB close 실패', e)
+            
+
 # The memory: Handles the internal memory that we add experiences that occur based on agent's actions,
 # and creates batches of experiences based on the mini-batch size for training.
 # 메모리: 에이전트의 행동에 따라 발생하는 경험을 추가하는 내부 메모리를 처리하고,
 # 훈련을 위한 미니 배치 크기를 기반으로 경험 배치를 생성합니다.
 class ReplayMemory:
 
-    def __init__(self, gridSize, maxMemory, discount):
+    def __init__(self, gridSize_x, gridSize_y, maxMemory, discount):
         self.maxMemory = maxMemory  # 최대 메모리
-        self.gridSize = gridSize  # 게임 화면 한 변의 길이
-        self.nbStates = self.gridSize * self.gridSize  # 게임 화면 크기
+        self.gridSize_x = gridSize_x  # 게임 화면 가로 길이
+        self.gridSize_y = gridSize_y  # 게임 화면 세로 길이
+        self.nbStates = self.gridSize_x * self.gridSize_y  # 게임 화면 크기
         self.discount = discount  # 할인율
-        canvas = np.zeros((self.gridSize, self.gridSize))  # 게임 화면을 0으로 채움
+        canvas = np.zeros((self.gridSize_x, self.gridSize_y))  # 게임 화면을 0으로 채움
         canvas = np.reshape(canvas, (-1, self.nbStates))  # [[0 0 0 0 0 ... 0 0 0 0 0]] 형태로 변환
         
         # 학습을 위한 데이터들을 저장
@@ -241,10 +347,17 @@ def main(_):
 
     # Define Environment
     # 환경 변수(게임 판의 크기, 행동 상태?) 설정
-    env = CatchEnvironment(gridSize)
+    # env = CatchEnvironment(gridSize_x, gridSize_y)
+    env = NotTetris2(3, 26, 98, 169)
+    # t1 = clock()
+    # env.load_game(3)
+    # for i in env.frames:
+        # print(i)
+    # print(clock()-t1)
+    # exit()
     
     # Define Replay Memory
-    memory = ReplayMemory(gridSize, maxMemory, discount)
+    memory = ReplayMemory(gridSize_x, gridSize_y, maxMemory, discount)
 
     # Add ops to save and restore all the variables.
     saver = tf2.train.Saver()
@@ -255,43 +368,49 @@ def main(_):
         # tf2.initialize_all_variables().run()
         tf2.global_variables_initializer().run()
 
-        for i in range(epoch):
+        for i in range(1, epoch):
             # Initialize the environment.
             err = 0
-            env.reset()
+            # env.reset()
+            env.load_game(i)
          
             isGameOver = False
 
             # The initial state of the environment.
-            currentState = env.observe()
+            # currentState = env.observe()
+            currentState = env.frames[0]['screenshot']
             
             # t3 = clock()
-            cnt = 0
+            cnt = 1
             while (isGameOver != True):
+            # for j in range(1, len(env.frames)-15):
                 # t1 = clock()
-                action = -9999  # action initilization
+                # action = -9999  # action initilization
                 # Decides if we should choose a random action, or an action from the policy network.
                 global epsilon
-                if (randf(0, 1) <= epsilon):
-                    action = random.randrange(1, nbActions + 1)
-                else: 
-                    # Forward the current state through the network.
-                    q = sess.run(output_layer, feed_dict={X: currentState}) 
-                    # Find the max index (the chosen action).
-                    index = q.argmax()
-                    action = index + 1         
-                    print(q, index)                 
+                # if (randf(0, 1) <= epsilon):
+                    # action = random.randrange(1, nbActions + 1)
+                # else: 
+                    # # Forward the current state through the network.
+                    # q = sess.run(output_layer, feed_dict={X: currentState}) 
+                    # # Find the max index (the chosen action).
+                    # index = q.argmax()
+                    # action = index + 1         
+                    # print(q, index)                 
 
                 # Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
                 if (epsilon > epsilonMinimumValue):
                     epsilon = epsilon * 0.999
                 
-                nextState, reward, gameOver, stateInfo = env.act(action)
+                nextState = env.frames[cnt]['screenshot']
+                reward = env.frames[cnt]['score'] - env.frames[cnt-1]['score']
+                gameOver = cnt+1 >= len(env.frames)-15
+                # stateInfo = #env.act(action)
                         
-                if (reward == 1):
-                    winCount = winCount + 1
+                # if (reward == 1):
+                    # winCount = winCount + 1
 
-                memory.remember(currentState, action, reward, nextState, gameOver)
+                memory.remember(currentState, env.frames[cnt]['key'], reward, nextState, gameOver)
                 
                 # Update the current state and if the game is over.
                 # 게임이 종료되면 현재 상태를 업데이트합니다.
@@ -303,7 +422,7 @@ def main(_):
                 t4 = clock()
                 inputs, targets = memory.getBatch(output_layer, batchSize, nbActions, nbStates, sess, X)
                 t5 = clock()
-                print(t5 - t4)
+                print(i, len(env.frames)-15, cnt, t5 - t4)
                 
                 # Train the network which returns the error.
                 # 오류를 반환하는 네트워크를 훈련시킵니다.
@@ -311,7 +430,7 @@ def main(_):
                 err = err + loss
                 
                 # t2 = clock()
-                # cnt+=1
+                cnt+=1
                 # print(t2-t3, cnt, (t2-t3)/cnt)
 
             print("Epoch " + str(i) + ": err = " + str(err) + ": Win count = " + str(winCount) + " Win ratio = " + str(float(winCount) / float(i + 1) * memory.nbStates))
