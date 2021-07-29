@@ -18,10 +18,10 @@ from time import perf_counter as clock
 from cx_Oracle import connect
 from datetime import datetime
 import PIL.Image as pilimg
-import NotAI
 from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
+import NotAI
 
 tf2.disable_eager_execution()
 
@@ -38,16 +38,16 @@ epsilonMinimumValue = 0.001
 # The number of actions. Since we only have left/stay/right that means 3 actions.
 # 작업 수입니다. 왼쪽/머무름/오른쪽만 있으므로 3가지 동작을 의미합니다.
 nbActions = 18  # [['', 'z', 'x'], ['', 'left', 'right'], ['', 'down']]의 조합
-epoch = 1+1  # The number of games we want the system to run for.
-hiddenSize = 1000  # Number of neurons in the hidden layers.
+epoch = 1#+100  # The number of games we want the system to run for.
+hiddenSize = 10 #20000  # Number of neurons in the hidden layers.
 maxMemory = 500  # 메모리의 크기(과거 경험을 저장하는 위치).
 
 # The mini-batch size for training. Samples are randomly taken from memory till mini-batch size.
 # 훈련용 미니 배치 크기. 샘플은 미니 배치 크기까지 메모리에서 무작위로 가져옵니다.
 batchSize = 50
 
-gridSize_x = 96#24  # 게임 화면 크기(가로)
-gridSize_y = 144#42  # 게임 화면 크기(세로)
+gridSize_x = 24 # 96  # 게임 화면 크기(가로)
+gridSize_y = 36 # 144  # 게임 화면 크기(세로)
 nbStates = gridSize_x * gridSize_y  # We eventually flatten to a 1d tensor to feed the network.
 discount = 0.9  # 할인은 네트워크가 보상을 더 빨리 받을 수 있는 상태를 선택하도록 하는 데 사용됩니다(0에서 1).
 learningRate = 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
@@ -229,7 +229,7 @@ class NotTetris2:
                     'score':i[7],
                     'level':i[8],
                     'line':i[9],
-                    'next_block':i[10],
+                    'next_block':i[10]
                     })
                 key_bool_li = [i[2], i[3], i[4], i[5], i[6]]
                 img_path = _dir + '\\%.4f_%s.png' % (i[1], key_bool_li)
@@ -237,8 +237,13 @@ class NotTetris2:
                 # print(self.frames[-1])
                 self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)#pilimg.open(img_path)
                 self.frames[-1]['screenshot'] = cv2.cvtColor(self.frames[-1]['screenshot'], cv2.COLOR_BGR2RGB)
+                # print(self.frames[-1]['screenshot'].shape)
+                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2+1, self.x1:self.x2+1, :]
+                # print(self.frames[-1]['screenshot'].shape)
+                self.frames[-1]['screenshot'] = NotAI._pooling(4, 4, self.frames[-1]['screenshot'], min_sw=True)[:,:,0]
+                # print(self.frames[-1]['screenshot'].shape)
                 # self.frames[-1]['screenshot'].show()
-                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2+1, self.x1:self.x2+1, 0].flatten()
+                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'].flatten()
                 # self.frames[-1]['screenshot'] = np.array(self.frames[-1]['screenshot'])[self.y1:self.y2+1, self.x1:self.x2+1]
                 # print(self.frames[-1]['screenshot'])
                 # plt.imshow(self.frames[-1]['screenshot'])
@@ -340,7 +345,7 @@ class ReplayMemory:
         return inputs, targets
         
         
-def main(_):
+def main(start, end):
     # print("sdf")
     # exit()
     print("Training new model")
@@ -366,9 +371,13 @@ def main(_):
     winCount = 0
     with tf2.Session() as sess: 
         # tf2.initialize_all_variables().run()
-        tf2.global_variables_initializer().run()
+        try:
+            saver.restore(sess, os.getcwd() + "/model.ckpt")
+            print('불러오기 성공')
+        except:
+            tf2.global_variables_initializer().run()
 
-        for i in range(1, epoch):
+        for i in range(start, end+1):
             # Initialize the environment.
             err = 0
             # env.reset()
@@ -396,7 +405,10 @@ def main(_):
                     # # Find the max index (the chosen action).
                     # index = q.argmax()
                     # action = index + 1         
-                    # print(q, index)                 
+                    # print(q, index)   
+                q = sess.run(output_layer, feed_dict={X:[currentState]})
+                index = q.argmax()
+                print(q, index)      
 
                 # Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
                 if (epsilon > epsilonMinimumValue):
@@ -422,7 +434,7 @@ def main(_):
                 t4 = clock()
                 inputs, targets = memory.getBatch(output_layer, batchSize, nbActions, nbStates, sess, X)
                 t5 = clock()
-                print(i, len(env.frames)-15, cnt, t5 - t4)
+                print(i, len(env.frames)-15, cnt, currentState.shape, inputs.shape, targets.shape, t5 - t4)
                 
                 # Train the network which returns the error.
                 # 오류를 반환하는 네트워크를 훈련시킵니다.
@@ -442,5 +454,6 @@ def main(_):
 
 
 if __name__ == '__main__':
-    tf2.app.run()  # main 함수로
+    main(1, epoch)
+    # tf2.app.run(1, epoch)  # main 함수로
 

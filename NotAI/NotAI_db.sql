@@ -1,3 +1,10 @@
+drop table NotAI_game3 cascade constraint purge;
+drop sequence NotAI_game3_seq;
+
+drop table NotAI_Control3 cascade constraint purge;
+drop sequence NotAI_Control3_seq;
+
+
 create table NotAI_game3(
 	ng_no number(10) primary key,
 	ng_start_time date not null,			-- 게임 시작 시간
@@ -7,8 +14,6 @@ create table NotAI_game3(
 );
 create sequence NotAI_game3_seq;
 
-drop table NotAI_game3 cascade constraint purge;
-drop sequence NotAI_game3_seq;
 
 create table NotAI_Control3
 (
@@ -31,9 +36,6 @@ create table NotAI_Control3
 		on delete cascade
 );
 create sequence NotAI_Control3_seq;
-
-drop table NotAI_Control3 cascade constraint purge;
-drop sequence NotAI_Control3_seq;
 
 select * from NotAI_game3;
 select * from NotAI_control3;

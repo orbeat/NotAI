@@ -9,6 +9,10 @@ from datetime import datetime
 from random import choice, sample, random
 import _pyautogui_win as platformModule
 from threading import Thread
+import tensorflow.compat.v1 as tf2
+import tensorflow as tf
+import cv2
+if __name__ == '__main__': import TrainNotTetris as tnt
 try:
     from cx_Oracle import connect
 except Exception as e:
@@ -20,6 +24,7 @@ class Operation:
     def __init__(self, db='choi', db_name='choi', ip='localhost'):
         clock()
         self.db, self.db_name, self.ip = db, db_name, ip
+        self.x1, self.y1, self.x2, self.y2 = 3, 26, 98, 169
         
         font = np.array(pilimg.open(r'img\font.png'))  # 글씨체 이미지를 읽어옴
         self.number_font = []
@@ -75,9 +80,9 @@ class Operation:
         self.blocks_img = np.array(self.blocks_img)[:,:3]
         print(self.blocks_img)
         
-        self.key_li = [['', 'z', 'x'], ['', 'left', 'right'], ['', 'down']] # 조작키 리스트(각각의 리스트에서는 한개의 키만 선택됨)
+        self.key_li = [['', 'z', 'x'], ['', 'left', 'right'], ['', 'down']]  # 조작키 리스트(각각의 리스트에서는 한개의 키만 선택됨)
         # self.key_li = [['z', 'x'], ['left', 'right'], ['down']] # 조작키 리스트(각각의 리스트에서는 한개의 키만 선택됨)
-        combination = 1 # 경우의 수(조합)계산
+        combination = 1  # 경우의 수(조합)계산
         for i in self.key_li:
             combination *= len(i)
         print(combination)
@@ -95,7 +100,7 @@ class Operation:
         self.key_li2 = []
         for i in self.key_li:
             for j in i:
-                if j=='': continue
+                if j == '': continue
                 self.key_li2.append(j)
         
         self.push_t = np.random.normal(0.5, 1, 1000)
@@ -107,21 +112,24 @@ class Operation:
         self.score, self.level, self.line = None, None, None
         self.next_piece = None
         self.info_li = []
+        
+        self.saver = tf2.train.Saver()
+        self.game_no = self.current_game_no()
     
     def number2key_bool_li(self, combination, number):
         push_key = []
         # n = 0
         for i in self.key_li:
-            combination //= len(i)   # 해당 자리의 값을 구함
+            combination //= len(i)  # 해당 자리의 값을 구함
             n = number // combination
             # print(combination, number, i, n)
             push_key.append(i[n])
-            number -= n*combination
+            number -= n * combination
         
         bool_li = []
         for i in self.key_li:
             for j in i:
-                if j=='': continue
+                if j == '': continue
                 bool_li.append(j in push_key)
         
         return bool_li
@@ -129,16 +137,16 @@ class Operation:
     def key_bool_li2number(self, combination, key_bool_li):
         jali_li = []
         for i in self.key_li:
-            combination //= len(i)   # 해당 자리의 값을 구함
+            combination //= len(i)  # 해당 자리의 값을 구함
             for j in range(len(i)):
-                if j==0: continue
-                jali_li.append(j*combination)
+                if j == 0: continue
+                jali_li.append(j * combination)
         jali_li = np.array(jali_li)
         # print(jali_li)
         # print(key_bool_li)
         # print(jali_li[np.array(key_bool_li)==1])
             
-        return np.sum(jali_li[np.array(key_bool_li)==1])
+        return np.sum(jali_li[np.array(key_bool_li) == 1])
     
     def avg_RGB(self, img):  # 해당 이미지에서 완전한 흰색(배경)을 제외한 RGB값의 평균을 반환함
         img = img[np.any(img[:,:,:3] != np.array([255, 255, 255]), axis=2)]  # 배경색([255,255,255]) 제외
@@ -205,6 +213,23 @@ class Operation:
         bo = hap == np.min(hap)
         return self.block_data_label[bo]
     
+    def current_game_no(self):
+        try:
+            con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip))  # db에 연결
+            cur = con.cursor()
+            sql = """
+            select max(ng_no) from NotAI_game3
+            """
+            # print(sql)
+            cur.execute(sql)
+            ng_no = None
+            for i in cur:
+                ng_no = i[0]
+        except:
+            ng_no = 1
+            
+        return ng_no
+    
     def save_data(self):
         try:
             con = connect('%s/%s@%s:1521/xe' % (self.db, self.db_name, self.ip))  # db에 연결
@@ -246,7 +271,7 @@ class Operation:
         createFolder(r'\orbeat\NotAI\data\log')
         f = open(r'\orbeat\NotAI\data\log\%s_%.4f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
         for i, v in enumerate(self.info_li):
-            _path = _dir + r'\%.4f_%s.png' % (v['current_clock'], v['key'])# 이미지의 경로
+            _path = _dir + r'\%.4f_%s.png' % (v['current_clock'], v['key'])  # 이미지의 경로
             Image.fromarray(v['screenshot'], 'RGB').save(_path)
             
             f.write('%.4f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['key'], v['score'], v['level'], v['line'], v['next_piece']))
@@ -270,8 +295,10 @@ class Operation:
             con.close()
         except Exception as e:
             print('commit error :', e)
+        
+        return ng_no
     
-    def game_frame(self, control_switch=True):
+    def game_frame(self, sess, control_switch=True):
         self.t3 = clock()
         self.full_screenshot = _full_screenshot(self.windows, npsw=True)
         # screenshots.append(self.full_screenshot)
@@ -285,32 +312,51 @@ class Operation:
         self.t4 = clock()
         
         self.t5 = clock()            
-        # key = choice(self.key_li)  # 누를키를 랜덤으로 선택함
-        # push_t = choice(self.push_t)  # 특정 키를 누를 시간을 선택함
         self.current_clock = clock()  # 현재 시각을 저장함
-        # self.key_bool_li = []
-        # self.push_t_li = []
-        # for key in self.key_li:
-            # self.is_push = (random() < 0.05) & control_switch # 어떤 키가 눌릴 확률은 5% 미만(임시 랜덤값)
-            # self.key_bool_li.append(int(self.is_push)) # 눌린 키를 저장함
-            # if self.is_push:
-                # # key_li.append(key)
-                # self.push_t_li.append(choice(self.push_t)) # 누르는 시간을 랜덤 선택함
-                # Thread(target=_press, args=(key, self.push_t_li[-1],)).start()  # 특정 키를 일정 시간동안 누르는 스레드를 생성함
-            # else:
-                # self.push_t_li.append(0) # 키가 눌리지 않음
+        
         self.key_bool_li = []
-        try:
-            # for i, v in enumerate(self.number2key_li[1]):
-            for i, v in enumerate(choice(self.number2key_li)):
-                if v and control_switch:
-                    self.key_bool_li.append(1)
-                    platformModule._keyDown(self.key_li2[i])
-                else:
-                    self.key_bool_li.append(0)
-                    platformModule._keyUp(self.key_li2[i])
-        except Exception as e:
-            print('에러 발생 :', e)
+        # if False:# or True:
+        epsilon = (0.99 ** self.game_no)
+        if(tnt.randf(0, 1) > epsilon) and self.ai_sw:
+            # with tf2.Session() as sess: 
+            if True:
+                # Restore variables from disk.
+                # self.saver.restore(sess, os.getcwd() + "/model.ckpt")
+                # print('saved model is loaded!')
+                
+                img = self.full_screenshot[self.y1:self.y2 + 1, self.x1:self.x2 + 1,:3]
+                img = _pooling(4, 4, img, min_sw=True)
+                img = rgb2gray(img)
+                # print(img, img.shape)
+                img = img.flatten()
+                # print(img, img.shape)
+                # exit()
+                
+                q = sess.run(tnt.output_layer, feed_dict={tnt.X:[img]})
+                # Find the max index (the chosen action).
+                index = q.argmax()
+                print(q, index)
+                action = index  # + 1
+                for i, v in enumerate(self.number2key_li[action]):
+                    if v and control_switch:
+                        self.key_bool_li.append(1)
+                        platformModule._keyDown(self.key_li2[i])
+                    else:
+                        self.key_bool_li.append(0)
+                        platformModule._keyUp(self.key_li2[i])
+        else:
+            try:
+                # for i, v in enumerate(self.number2key_li[1]):
+                for i, v in enumerate(choice(self.number2key_li)):
+                    if v and control_switch:
+                        self.key_bool_li.append(1)
+                        platformModule._keyDown(self.key_li2[i])
+                    else:
+                        self.key_bool_li.append(0)
+                        platformModule._keyUp(self.key_li2[i])
+            except Exception as e:
+                print('에러 발생 :', e)
+                
         self.t6 = clock()
         
         self.t1 = clock()
@@ -340,8 +386,8 @@ class Operation:
                                                                                      self.t6 - self.t5))
         # print(self.next_piece, t2 - t1)
         # while True:
-        self.game_time = clock() - self.start_game_clock # 게임이 시작하고 나서 지난 시간
-        self.delay = self.second_per_frame * self.cnt - self.game_time # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
+        self.game_time = clock() - self.start_game_clock  # 게임이 시작하고 나서 지난 시간
+        self.delay = self.second_per_frame * self.cnt - self.game_time  # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
         # print(cnt, game_time, delay)
         if self.delay >= 0:
             sleep(self.delay)
@@ -397,35 +443,41 @@ class Operation:
         print("%11s %5s %3s %4s %s %s %s %s %s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
                                                                               'z', 'x', 'l', 'r', 'd',
                                                                               'p', 'tForCal', 'tForCap', 'tForPus'))
-        key = None
-        # self.key_li = []
-        self.key_bool_li = []
-        # push_t = None
-        self.push_t_li = []
-        self.current_clock = None
-        # screenshots = []
-        self.info_li = []
-        # bool_li = [True, False]
-        self.is_push = None
-        self.cnt = 1 # 반복 횟수
-        self.game_time = None
-        self.fps = 10
-        self.second_per_frame = 1/self.fps # 1초에 fps번 캡쳐 (및 조작)
-        self.t1, self.t2 = None, None
-        self.t3, self.t4 = None, None
-        self.t5, self.t6 = None, None
+        with tf2.Session() as sess:
+            try:
+                self.saver.restore(sess, os.getcwd() + "/model.ckpt")
+                self.ai_sw = True
+            except:
+                self.ai_sw = False
+            key = None
+            # self.key_li = []
+            self.key_bool_li = []
+            # push_t = None
+            self.push_t_li = []
+            self.current_clock = None
+            # screenshots = []
+            self.info_li = []
+            # bool_li = [True, False]
+            self.is_push = None
+            self.cnt = 1  # 반복 횟수
+            self.game_time = None
+            self.fps = 10
+            self.second_per_frame = 1 / self.fps  # 1초에 fps번 캡쳐 (및 조작)
+            self.t1, self.t2 = None, None
+            self.t3, self.t4 = None, None
+            self.t5, self.t6 = None, None
         ############################################################################################################
         #=========================================================================================================
-        _press('enter', 0)  # 일시정지 해제
-        # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
-        self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
-        self.start_game_clock = clock()
-        # print(self.start_game_clock)
-        for i in range(3): # DQN에 넣을 이미지를 캡쳐함
-            self.game_frame(control_switch=False)
-            
-        while self.game_frame(control_switch=True):
-            pass
+            _press('enter', 0)  # 일시정지 해제
+            # self.full_screenshot = _full_screenshot(self.windows, npsw=True)
+            self.start_game_time = datetime.strftime(datetime.today(), '%Y%m%d-%H%M%S')
+            self.start_game_clock = clock()
+            # print(self.start_game_clock)
+            for i in range(3):  # DQN에 넣을 이미지를 캡쳐함
+                self.game_frame(sess, control_switch=False)
+                
+            while self.game_frame(sess, control_switch=True):
+                pass
         #=========================================================================================================
         ############################################################################################################
                 
@@ -448,8 +500,12 @@ class Operation:
         print('게임 종료')
         
         print('데이터 저장 중', clock())
-        self.save_data()
+        self.current_game_no = self.save_data()
         print('데이터 저장 완료', clock())
+        
+        print('학습 중', clock())
+        tnt.main(self.current_game_no, self.current_game_no)  # 방금 진행한 판 학습
+        print('학습 완료', clock())
             
         _press('left', 0.5)
         _press('down', 0.5)
@@ -500,6 +556,12 @@ class Operation:
                 
                 self.full_screenshot = _full_screenshot(self.windows, npsw=False)
                 self.full_screenshot.save(r'report\new_record\%s_2.png' % self.end_game_time)
+
+
+def rgb2gray(rgb):
+    r, g, b = rgb[:,:, 0], rgb[:,:, 1], rgb[:,:, 2]
+    gray = 0.2989 * r + 0.5870 * g + 0.1140 * b
+    return gray  # .astype('uint8')
 
 
 def createFolder(directory):  # 출처: https://data-make.tistory.com/170 [Data Makes Our Future]
