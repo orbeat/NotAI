@@ -222,9 +222,11 @@ class Operation:
             """
             # print(sql)
             cur.execute(sql)
-            ng_no = None
+            ng_no = 0
             for i in cur:
+                # print(i)
                 ng_no = i[0]
+            if ng_no == None: ng_no = 0
         except:
             ng_no = 1
             
@@ -298,6 +300,20 @@ class Operation:
         
         return ng_no
     
+    def jiyeon(self):
+        self.game_time = clock() - self.start_game_clock  # 게임이 시작하고 나서 지난 시간
+        self.delay = self.second_per_frame * self.cnt - self.game_time  # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
+        
+        if self.delay >= 0:
+            sleep(self.delay)
+            # continue
+        elif self.delay > -0.5:
+            pass
+            # break
+        else:
+            print("너무 느린 실행 속도")
+            exit()
+    
     def game_frame(self, sess, control_switch=True):
         self.t3 = clock()
         self.full_screenshot = _full_screenshot(self.windows, npsw=True)
@@ -317,7 +333,7 @@ class Operation:
         self.key_bool_li = []
         # if False:# or True:
         epsilon = (0.99 ** self.game_no)
-        if(tnt.randf(0, 1) > epsilon) and self.ai_sw:
+        if(tnt.randf(0, 1) > epsilon) and self.ai_sw and False:
             # with tf2.Session() as sess: 
             if True:
                 # Restore variables from disk.
@@ -338,32 +354,43 @@ class Operation:
                 print(q, index)
                 action = index  # + 1
                 for i, v in enumerate(self.number2key_li[action]):
-                    if v and control_switch:
-                        self.key_bool_li.append(1)
+                    if v and control_switch and self.key_state[i]!=v:
+                        # self.key_bool_li.append(1)
                         platformModule._keyDown(self.key_li2[i])
-                    else:
-                        self.key_bool_li.append(0)
+                    elif self.key_state[i]!=v:
+                        # self.key_bool_li.append(0)
                         platformModule._keyUp(self.key_li2[i])
+                    self.key_bool_li.append(int(v))
+                    self.key_state[i] = v
         else:
             try:
                 # for i, v in enumerate(self.number2key_li[1]):
                 for i, v in enumerate(choice(self.number2key_li)):
-                    if v and control_switch:
-                        self.key_bool_li.append(1)
+                    if v and control_switch and self.key_state[i]!=v:
+                        # self.key_bool_li.append(1)
                         platformModule._keyDown(self.key_li2[i])
-                    else:
-                        self.key_bool_li.append(0)
+                    elif self.key_state[i]!=v:
+                        # self.key_bool_li.append(0)
                         platformModule._keyUp(self.key_li2[i])
+                    self.key_bool_li.append(int(v))
+                    self.key_state[i] = v
             except Exception as e:
                 print('에러 발생 :', e)
+                exit()
                 
         self.t6 = clock()
         
         self.t1 = clock()
-        self.score = self.check_score()
-        self.level = self.check_level()
-        self.line = self.check_line()
-        self.next_piece = self.check_block()[0]
+        try:
+            self.score = self.check_score()
+            self.level = self.check_level()
+            self.line = self.check_line()
+            self.next_piece = self.check_block()[0]
+        except Exception as e:
+            print('확인 실패 :', e)
+            self.jiyeon()
+            self.cnt += 1
+            return True
         
         self.info_li.append({'current_clock':self.current_clock,
                          'score':self.score,
@@ -376,28 +403,29 @@ class Operation:
         self.t2 = clock()
         # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
         # print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
-        print("%11.4f %5d %3d %4d %d %d %d %d %d %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
+        print("%11.4f %5d %3d %4d %d %d %d %d %d %1s %7.5f %7.5f %7.5f %5d %7.6f" % (self.current_clock, self.score, self.level,
                                                                                      self.line, self.key_bool_li[0],
                                                                                      self.key_bool_li[1], self.key_bool_li[2],
                                                                                      self.key_bool_li[3], self.key_bool_li[4],
                                                                                      # self.push_t_li,
                                                                                      self.next_piece,
                                                                                      self.t2 - self.t1, self.t4 - self.t3,
-                                                                                     self.t6 - self.t5))
+                                                                                     self.t6 - self.t5, self.game_no, self.delay))
         # print(self.next_piece, t2 - t1)
         # while True:
-        self.game_time = clock() - self.start_game_clock  # 게임이 시작하고 나서 지난 시간
-        self.delay = self.second_per_frame * self.cnt - self.game_time  # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
+        self.jiyeon()
+        # self.game_time = clock() - self.start_game_clock  # 게임이 시작하고 나서 지난 시간
+        # self.delay = self.second_per_frame * self.cnt - self.game_time  # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
         # print(cnt, game_time, delay)
-        if self.delay >= 0:
-            sleep(self.delay)
-            # continue
-        elif self.delay > -1:
-            pass
-            # break
-        else:
-            print("너무 느린 실행 속도")
-            exit()
+        # if self.delay >= 0:
+            # sleep(self.delay)
+            # # continue
+        # elif self.delay > -0.5:
+            # pass
+            # # break
+        # else:
+            # print("너무 느린 실행 속도")
+            # exit()
         self.cnt += 1
         return True
     
@@ -466,6 +494,8 @@ class Operation:
             self.t1, self.t2 = None, None
             self.t3, self.t4 = None, None
             self.t5, self.t6 = None, None
+            self.key_state = [False, False, False, False, False]
+            self.delay = 0
         ############################################################################################################
         #=========================================================================================================
             _press('enter', 0)  # 일시정지 해제
@@ -500,12 +530,12 @@ class Operation:
         print('게임 종료')
         
         print('데이터 저장 중', clock())
-        self.current_game_no = self.save_data()
+        self.game_no = self.save_data()
         print('데이터 저장 완료', clock())
         
-        print('학습 중', clock())
-        tnt.main(self.current_game_no, self.current_game_no)  # 방금 진행한 판 학습
-        print('학습 완료', clock())
+        # print('학습 중', clock())
+        # tnt.main(self.game_no, self.game_no)  # 방금 진행한 판 학습
+        # print('학습 완료', clock())
             
         _press('left', 0.5)
         _press('down', 0.5)

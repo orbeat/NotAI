@@ -39,3 +39,10 @@ create sequence NotAI_Control3_seq;
 
 select * from NotAI_game3;
 select * from NotAI_control3;
+
+select ng_no, max(nc_no)-min(nc_no)+1, max(nc_score), max(nc_level), max(nc_line) -- 게임 번호, 진행 프레임 수, 최종 점수, 최종 레벨, 최종 라인수
+from NotAI_game3, NotAI_Control3
+where ng_no = nc_ng_no
+group by ng_no
+order by ng_no;
+

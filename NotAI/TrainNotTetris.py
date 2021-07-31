@@ -24,6 +24,7 @@ import matplotlib.pyplot as plt
 import NotAI
 
 tf2.disable_eager_execution()
+# tf2.enable_eager_execution()
 
 # Parameters
 
@@ -52,16 +53,23 @@ nbStates = gridSize_x * gridSize_y  # We eventually flatten to a 1d tensor to fe
 discount = 0.9  # 할인은 네트워크가 보상을 더 빨리 받을 수 있는 상태를 선택하도록 하는 데 사용됩니다(0에서 1).
 learningRate = 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
 
+# tf.Variable(tf2.random_uniform([len(xData[0]),100],-1, 1, tf.float64))
 # Create the base model.
 X = tf2.placeholder(tf.float32, [None, nbStates])
-W1 = tf.Variable(tf2.truncated_normal([nbStates, hiddenSize], stddev=1.0 / math.sqrt(float(nbStates))))
-b1 = tf.Variable(tf2.truncated_normal([hiddenSize], stddev=0.01))    
+# W1 = tf.Variable(tf2.truncated_normal([nbStates, hiddenSize], stddev=1.0 / math.sqrt(float(nbStates))))
+# 정규분포, He 초기값(sqrt(2/n))
+W1 = tf.Variable(tf2.random_normal([nbStates, hiddenSize], stddev=math.sqrt(2.0 / float(nbStates))))
+b1 = tf.Variable(tf2.random_normal([hiddenSize], stddev=0.01))    
 input_layer = tf.nn.relu(tf.matmul(X, W1) + b1)
-W2 = tf.Variable(tf2.truncated_normal([hiddenSize, hiddenSize], stddev=1.0 / math.sqrt(float(hiddenSize))))
-b2 = tf.Variable(tf2.truncated_normal([hiddenSize], stddev=0.01))
+
+# W2 = tf.Variable(tf2.truncated_normal([hiddenSize, hiddenSize], stddev=1.0 / math.sqrt(float(hiddenSize))))
+W2 = tf.Variable(tf2.random_normal([hiddenSize, hiddenSize], stddev=math.sqrt(2.0 / float(hiddenSize))))
+b2 = tf.Variable(tf2.random_normal([hiddenSize], stddev=0.01))
 hidden_layer = tf.nn.relu(tf.matmul(input_layer, W2) + b2)
-W3 = tf.Variable(tf2.truncated_normal([hiddenSize, nbActions], stddev=1.0 / math.sqrt(float(hiddenSize))))
-b3 = tf.Variable(tf2.truncated_normal([nbActions], stddev=0.01))
+
+# W3 = tf.Variable(tf2.truncated_normal([hiddenSize, nbActions], stddev=1.0 / math.sqrt(float(hiddenSize))))
+W3 = tf.Variable(tf2.random_normal([hiddenSize, nbActions], stddev=math.sqrt(2.0 / float(hiddenSize))))
+b3 = tf.Variable(tf2.random_normal([nbActions], stddev=0.01))
 output_layer = tf.matmul(hidden_layer, W3) + b3
 
 # True labels
@@ -376,6 +384,11 @@ def main(start, end):
             print('불러오기 성공')
         except:
             tf2.global_variables_initializer().run()
+        # ss = sess.run(W1)
+        # for i in ss:
+            # for j in i:
+                # print(j)
+        # exit()
 
         for i in range(start, end+1):
             # Initialize the environment.
