@@ -8,8 +8,8 @@
     The agent plays a game of catch. Fruits drop from the sky and the agent can choose the actions
     left/stay/right to catch the fruit before it reaches the ground.
 """
-import tensorflow.compat.v1 as tf2
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+import tensorflow as tf2
 import numpy as np
 import random
 import math
@@ -22,9 +22,11 @@ from PIL import Image
 import cv2
 import matplotlib.pyplot as plt
 import NotAI
+import Create_Model
+from random import shuffle
 
-tf2.disable_eager_execution()
-# tf2.enable_eager_execution()
+tf.disable_eager_execution()
+# tf.enable_eager_execution()
 
 # Parameters
 
@@ -39,49 +41,50 @@ epsilonMinimumValue = 0.001
 # The number of actions. Since we only have left/stay/right that means 3 actions.
 # 작업 수입니다. 왼쪽/머무름/오른쪽만 있으므로 3가지 동작을 의미합니다.
 nbActions = 18  # [['', 'z', 'x'], ['', 'left', 'right'], ['', 'down']]의 조합
-epoch = 1#+100  # The number of games we want the system to run for.
-hiddenSize = 10 #20000  # Number of neurons in the hidden layers.
+epoch = 1  # +100  # The number of games we want the system to run for.
+hiddenSize = 2000#10  # 20000  # Number of neurons in the hidden layers.
 maxMemory = 500  # 메모리의 크기(과거 경험을 저장하는 위치).
 
 # The mini-batch size for training. Samples are randomly taken from memory till mini-batch size.
 # 훈련용 미니 배치 크기. 샘플은 미니 배치 크기까지 메모리에서 무작위로 가져옵니다.
 batchSize = 50
 
-gridSize_x = 24 # 96  # 게임 화면 크기(가로)
-gridSize_y = 36 # 144  # 게임 화면 크기(세로)
+gridSize_x = 41 # 82  # 24 # 96  # 게임 화면 크기(가로)
+gridSize_y = 41 # 82  # 36 # 144  # 게임 화면 크기(세로)
+chanel = 3  # 채널 수
 nbStates = gridSize_x * gridSize_y  # We eventually flatten to a 1d tensor to feed the network.
 discount = 0.9  # 할인은 네트워크가 보상을 더 빨리 받을 수 있는 상태를 선택하도록 하는 데 사용됩니다(0에서 1).
-learningRate = 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
+learningRate = 0.000000001  # 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
 
-# tf.Variable(tf2.random_uniform([len(xData[0]),100],-1, 1, tf.float64))
+# tf2.Variable(tf.random_uniform([len(xData[0]),100],-1, 1, tf2.float64))
 # Create the base model.
-X = tf2.placeholder(tf.float32, [None, nbStates])
-# W1 = tf.Variable(tf2.truncated_normal([nbStates, hiddenSize], stddev=1.0 / math.sqrt(float(nbStates))))
+X = tf.placeholder(tf2.float32, [None, nbStates])
+# W1 = tf2.Variable(tf.truncated_normal([nbStates, hiddenSize], stddev=1.0 / math.sqrt(float(nbStates))))
 # 정규분포, He 초기값(sqrt(2/n))
-W1 = tf.Variable(tf2.random_normal([nbStates, hiddenSize], stddev=math.sqrt(2.0 / float(nbStates))))
-b1 = tf.Variable(tf2.random_normal([hiddenSize], stddev=0.01))    
-input_layer = tf.nn.relu(tf.matmul(X, W1) + b1)
+W1 = tf2.Variable(tf.random_normal([nbStates, hiddenSize], stddev=math.sqrt(2.0 / float(nbStates))))
+b1 = tf2.Variable(tf.random_normal([hiddenSize], stddev=0.01))    
+input_layer = tf2.nn.relu(tf2.matmul(X, W1) + b1)
 
-# W2 = tf.Variable(tf2.truncated_normal([hiddenSize, hiddenSize], stddev=1.0 / math.sqrt(float(hiddenSize))))
-W2 = tf.Variable(tf2.random_normal([hiddenSize, hiddenSize], stddev=math.sqrt(2.0 / float(hiddenSize))))
-b2 = tf.Variable(tf2.random_normal([hiddenSize], stddev=0.01))
-hidden_layer = tf.nn.relu(tf.matmul(input_layer, W2) + b2)
+# W2 = tf2.Variable(tf.truncated_normal([hiddenSize, hiddenSize], stddev=1.0 / math.sqrt(float(hiddenSize))))
+W2 = tf2.Variable(tf.random_normal([hiddenSize, hiddenSize], stddev=math.sqrt(2.0 / float(hiddenSize))))
+b2 = tf2.Variable(tf.random_normal([hiddenSize], stddev=0.01))
+hidden_layer = tf2.nn.relu(tf2.matmul(input_layer, W2) + b2)
 
-# W3 = tf.Variable(tf2.truncated_normal([hiddenSize, nbActions], stddev=1.0 / math.sqrt(float(hiddenSize))))
-W3 = tf.Variable(tf2.random_normal([hiddenSize, nbActions], stddev=math.sqrt(2.0 / float(hiddenSize))))
-b3 = tf.Variable(tf2.random_normal([nbActions], stddev=0.01))
-output_layer = tf.matmul(hidden_layer, W3) + b3
+# W3 = tf2.Variable(tf.truncated_normal([hiddenSize, nbActions], stddev=1.0 / math.sqrt(float(hiddenSize))))
+W3 = tf2.Variable(tf.random_normal([hiddenSize, nbActions], stddev=math.sqrt(2.0 / float(hiddenSize))))
+b3 = tf2.Variable(tf.random_normal([nbActions], stddev=0.01))
+output_layer = tf2.matmul(hidden_layer, W3) + b3
 
 # True labels
-Y = tf2.placeholder(tf.float32, [None, nbActions])
+Y = tf.placeholder(tf2.float32, [None, nbActions])
 
 # Mean squared error cost function
 # 평균 제곱 오차 비용 함수
-cost = tf.reduce_sum(tf.square(Y - output_layer)) / (2 * batchSize)
+cost = tf2.reduce_sum(tf2.square(Y - output_layer)) / (2 * batchSize)
 
 # Stochastic Gradient Decent Optimizer
 # # 확률적 경사하강법 최적화
-optimizer = tf2.train.GradientDescentOptimizer(learningRate).minimize(cost)
+optimizer = tf.train.GradientDescentOptimizer(learningRate).minimize(cost)
 
 
 # Helper function: Chooses a random value between the two boundaries.
@@ -172,13 +175,17 @@ class CatchEnvironment():
 
 class NotTetris2:
 
-    def __init__(self, x1, y1, x2, y2, db='choi', db_name='choi', ip='localhost'):
+    def __init__(self, sess, x1, y1, x2, y2, gridSize_x, gridSize_y, chanel, output,
+                 db='choi', db_name='choi', ip='localhost'):
         self.x1, self.y1, self.x2, self.y2 = x1, y1, x2, y2  # 불러올 이미지 영역
         self.db = db
         self.db_name = db_name
         self.ip = ip
+        self.gridSize_x, self.gridSize_y, self.chanel, self.output = gridSize_x, gridSize_y, chanel, output
         
-        self.oper = NotAI.Operation()
+        # self.model = Create_Model.Model(sess, 'model', self.chanel, self.gridSize_y, self.gridSize_x, self.output)
+        self.oper = NotAI.Operation()        
+        
         # print('n :', self.oper.key_bool_li2number(self.oper.nbActions, [0,1,0,1,0]))
         # print(self.oper.nbActions)
     
@@ -225,41 +232,43 @@ class NotTetris2:
             
             self.frames = []
             for i in cur:
-                # print(i)
-                self.frames.append({
-                    'nc_no':i[0],
-                    'current_clock':i[1],
-                    'z':i[2],
-                    'x':i[3],
-                    'left':i[4],
-                    'right':i[5],
-                    'down':i[6],
-                    'score':i[7],
-                    'level':i[8],
-                    'line':i[9],
-                    'next_block':i[10]
-                    })
+                # print(i, self.frames)
+                self.frames.append({})
+                self.frames[-1]['nc_no'] = i[0]
+                self.frames[-1]['current_clock'] = i[1]
+                self.frames[-1]['z'] = i[2]
+                self.frames[-1]['x'] = i[3]
+                self.frames[-1]['left'] = i[4]
+                self.frames[-1]['right'] = i[5]
+                self.frames[-1]['down'] = i[6]
+                self.frames[-1]['score'] = i[7]
+                self.frames[-1]['level'] = i[8]
+                self.frames[-1]['line'] = i[9]
+                self.frames[-1]['next_block'] = i[10]
                 key_bool_li = [i[2], i[3], i[4], i[5], i[6]]
                 img_path = _dir + '\\%.4f_%s.png' % (i[1], key_bool_li)
                 self.frames[-1]['key'] = self.oper.key_bool_li2number(self.oper.nbActions, key_bool_li)
                 # print(self.frames[-1])
-                self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)#pilimg.open(img_path)
+                self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # pilimg.open(img_path)
                 self.frames[-1]['screenshot'] = cv2.cvtColor(self.frames[-1]['screenshot'], cv2.COLOR_BGR2RGB)
-                # print(self.frames[-1]['screenshot'].shape)
-                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2+1, self.x1:self.x2+1, :]
-                # print(self.frames[-1]['screenshot'].shape)
-                self.frames[-1]['screenshot'] = NotAI._pooling(4, 4, self.frames[-1]['screenshot'], min_sw=True)[:,:,0]
-                # print(self.frames[-1]['screenshot'].shape)
-                # self.frames[-1]['screenshot'].show()
+                # # print(self.frames[-1]['screenshot'].shape)
+                # self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2+1, self.x1:self.x2+1, :]
+                # # print(self.frames[-1]['screenshot'].shape)
+                # self.frames[-1]['screenshot'] = NotAI._pooling(4, 4, self.frames[-1]['screenshot'], min_sw=True)[:,:,0]
+                # # print(self.frames[-1]['screenshot'].shape)
+                # # self.frames[-1]['screenshot'].show()
+                # self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'].flatten()
+                # # self.frames[-1]['screenshot'] = np.array(self.frames[-1]['screenshot'])[self.y1:self.y2+1, self.x1:self.x2+1]
+                # # print(self.frames[-1]['screenshot'])
+                # # plt.imshow(self.frames[-1]['screenshot'])
+                # # plt.show()
+                
+                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2 + 1, self.x1:self.x2 + 1,:]
+                self.frames[-1]['screenshot'] = NotAI._pooling(2, 2, self.frames[-1]['screenshot'], min_sw=True)[:,:, 0]
                 self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'].flatten()
-                # self.frames[-1]['screenshot'] = np.array(self.frames[-1]['screenshot'])[self.y1:self.y2+1, self.x1:self.x2+1]
-                # print(self.frames[-1]['screenshot'])
-                # plt.imshow(self.frames[-1]['screenshot'])
-                # plt.show()
                 
                 # Image.fromarray(self.frames[-1]['screenshot'], 'RGB').show()
                 # exit()
-                
             
         except Exception as e:
             print('DB불러오기 실패', e)
@@ -276,7 +285,7 @@ class NotTetris2:
 # 훈련을 위한 미니 배치 크기를 기반으로 경험 배치를 생성합니다.
 class ReplayMemory:
 
-    def __init__(self, gridSize_x, gridSize_y, maxMemory, discount):
+    def __init__(self, gridSize_x, gridSize_y, maxMemory, discount, env):
         self.maxMemory = maxMemory  # 최대 메모리
         self.gridSize_x = gridSize_x  # 게임 화면 가로 길이
         self.gridSize_y = gridSize_y  # 게임 화면 세로 길이
@@ -294,6 +303,8 @@ class ReplayMemory:
         
         self.count = 0
         self.current = 0
+        
+        self.env = env
 
     # Appends the experience to the memory.
     def remember(self, currentState, action, reward, nextState, gameOver):
@@ -319,6 +330,8 @@ class ReplayMemory:
 
         # Fill the inputs and targets up.
         # 입력과 대상을 채웁니다.
+        # print(chosenBatchSize)
+        # print(range(chosenBatchSize))
         for i in range(chosenBatchSize):
             if memoryLength == 1:
                 memoryLength = 2
@@ -354,43 +367,45 @@ class ReplayMemory:
         
         
 def main(start, end):
-    # print("sdf")
-    # exit()
-    print("Training new model")
-
-    # Define Environment
-    # 환경 변수(게임 판의 크기, 행동 상태?) 설정
-    # env = CatchEnvironment(gridSize_x, gridSize_y)
-    env = NotTetris2(3, 26, 98, 169)
-    # t1 = clock()
-    # env.load_game(3)
-    # for i in env.frames:
-        # print(i)
-    # print(clock()-t1)
-    # exit()
+    with tf.Session() as sess: 
+        # print("sdf")
+        # exit()
+        print("Training new model")
     
-    # Define Replay Memory
-    memory = ReplayMemory(gridSize_x, gridSize_y, maxMemory, discount)
-
-    # Add ops to save and restore all the variables.
-    saver = tf2.train.Saver()
-    # checkpoint = tf.train.Checkpoint()
+        # Define Environment
+        # 환경 변수(게임 판의 크기, 행동 상태?) 설정
+        # env = CatchEnvironment(gridSize_x, gridSize_y)
+        # env = NotTetris2(sess, 3, 26, 98, 169, gridSize_x, gridSize_y, chanel, nbActions)
+        env = NotTetris2(sess, 17, 88, 98, 169, gridSize_x, gridSize_y, chanel, nbActions)
+        # t1 = clock()
+        # env.load_game(3)
+        # for i in env.frames:
+            # print(i)
+        # print(clock()-t1)
+        # exit()
+        
+        # Define Replay Memory
+        memory = ReplayMemory(gridSize_x, gridSize_y, maxMemory, discount, env)
     
-    winCount = 0
-    with tf2.Session() as sess: 
-        # tf2.initialize_all_variables().run()
+        # Add ops to save and restore all the variables.
+        saver = tf.train.Saver()
+        # checkpoint = tf2.train.Checkpoint()
+        
+        winCount = 0
+        # tf.initialize_all_variables().run()
+        
         try:
             saver.restore(sess, os.getcwd() + "/model.ckpt")
             print('불러오기 성공')
         except:
-            tf2.global_variables_initializer().run()
+            tf.global_variables_initializer().run()
         # ss = sess.run(W1)
         # for i in ss:
             # for j in i:
                 # print(j)
         # exit()
 
-        for i in range(start, end+1):
+        for i in range(start, end + 1):
             # Initialize the environment.
             err = 0
             # env.reset()
@@ -404,7 +419,12 @@ def main(start, end):
             
             # t3 = clock()
             cnt = 1
-            while (isGameOver != True):
+            # while (isGameOver != True):
+            # print(list(range(len(env.frames))))
+            frame_li = list(range(len(env.frames)))
+            # shuffle(frame_li)
+            for cnt in frame_li:
+                print('cnt :', cnt)
             # for j in range(1, len(env.frames)-15):
                 # t1 = clock()
                 # action = -9999  # action initilization
@@ -420,6 +440,7 @@ def main(start, end):
                     # action = index + 1         
                     # print(q, index)   
                 q = sess.run(output_layer, feed_dict={X:[currentState]})
+                # q = sess.run(env.model.logits, feed_dict={env.model.X:[currentState]})
                 index = q.argmax()
                 print(q, index)      
 
@@ -428,8 +449,8 @@ def main(start, end):
                     epsilon = epsilon * 0.999
                 
                 nextState = env.frames[cnt]['screenshot']
-                reward = env.frames[cnt]['score'] - env.frames[cnt-1]['score']
-                gameOver = cnt+1 >= len(env.frames)-15
+                reward = env.frames[cnt]['score'] - env.frames[cnt - 1]['score']
+                gameOver = cnt + 1 >= len(env.frames) - 15
                 # stateInfo = #env.act(action)
                         
                 # if (reward == 1):
@@ -446,17 +467,20 @@ def main(start, end):
                 # 우리는 모델을 훈련하기 위해 훈련 데이터의 배치를 얻습니다.
                 t4 = clock()
                 inputs, targets = memory.getBatch(output_layer, batchSize, nbActions, nbStates, sess, X)
+                # inputs, targets = memory.getBatch(env.model.logits, batchSize, nbActions, nbStates, sess, env.model.X)
                 t5 = clock()
-                print(i, len(env.frames)-15, cnt, currentState.shape, inputs.shape, targets.shape, t5 - t4)
+                print(i, len(env.frames) - 15, cnt, currentState.shape, inputs.shape, targets.shape, t5 - t4)
                 
                 # Train the network which returns the error.
                 # 오류를 반환하는 네트워크를 훈련시킵니다.
-                _, loss = sess.run([optimizer, cost], feed_dict={X: inputs, Y: targets})    
+                _, loss = sess.run([optimizer, cost], feed_dict={X: inputs, Y: targets})
+                # _, loss = sess.run([env.model.optimizer, env.model.cost], feed_dict={env.model.X: inputs, env.model.Y: targets})    
                 err = err + loss
                 
                 # t2 = clock()
-                cnt+=1
+                cnt += 1
                 # print(t2-t3, cnt, (t2-t3)/cnt)
+                if isGameOver: break
 
             print("Epoch " + str(i) + ": err = " + str(err) + ": Win count = " + str(winCount) + " Win ratio = " + str(float(winCount) / float(i + 1) * memory.nbStates))
         # Save the variables to disk.
@@ -468,5 +492,5 @@ def main(start, end):
 
 if __name__ == '__main__':
     main(1, epoch)
-    # tf2.app.run(1, epoch)  # main 함수로
+    # tf.app.run(1, epoch)  # main 함수로
 

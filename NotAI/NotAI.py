@@ -9,8 +9,8 @@ from datetime import datetime
 from random import choice, sample, random
 import _pyautogui_win as platformModule
 from threading import Thread
-import tensorflow.compat.v1 as tf2
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+import tensorflow as tf2
 import cv2
 if __name__ == '__main__': import TrainNotTetris as tnt
 try:
@@ -24,7 +24,7 @@ class Operation:
     def __init__(self, db='choi', db_name='choi', ip='localhost'):
         clock()
         self.db, self.db_name, self.ip = db, db_name, ip
-        self.x1, self.y1, self.x2, self.y2 = 3, 26, 98, 169
+        self.x1, self.y1, self.x2, self.y2 = 17, 88, 98, 169#3, 26, 98, 169
         
         font = np.array(pilimg.open(r'img\font.png'))  # 글씨체 이미지를 읽어옴
         self.number_font = []
@@ -113,7 +113,7 @@ class Operation:
         self.next_piece = None
         self.info_li = []
         
-        self.saver = tf2.train.Saver()
+        self.saver = tf.train.Saver()
         self.game_no = self.current_game_no()
     
     def number2key_bool_li(self, combination, number):
@@ -228,7 +228,7 @@ class Operation:
                 ng_no = i[0]
             if ng_no == None: ng_no = 0
         except:
-            ng_no = 1
+            ng_no = 0
             
         return ng_no
     
@@ -270,33 +270,36 @@ class Operation:
         _path = None
         # 추후 OracleDB에 바로 저장하도록 바꾸기(스크린샷은 그대로 폴더에 저장)
         
-        createFolder(r'\orbeat\NotAI\data\log')
-        f = open(r'\orbeat\NotAI\data\log\%s_%.4f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
-        for i, v in enumerate(self.info_li):
-            _path = _dir + r'\%.4f_%s.png' % (v['current_clock'], v['key'])  # 이미지의 경로
-            Image.fromarray(v['screenshot'], 'RGB').save(_path)
-            
-            f.write('%.4f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['key'], v['score'], v['level'], v['line'], v['next_piece']))
+        try:
+            createFolder(r'\orbeat\NotAI\data\log')
+            f = open(r'\orbeat\NotAI\data\log\%s_%.4f.txt' % (self.start_game_time, self.start_game_clock), 'a', encoding='UTF-8')
+            for i, v in enumerate(self.info_li):
+                _path = _dir + r'\%.4f_%s.png' % (v['current_clock'], v['key'])  # 이미지의 경로
+                Image.fromarray(v['screenshot'], 'RGB').save(_path)
+                
+                f.write('%.4f\t%s\t%d\t%d\t%d\t%s\n' % (v['current_clock'], v['key'], v['score'], v['level'], v['line'], v['next_piece']))
+                
+                try:
+                    # print(v)
+                    sql = """
+                    insert into NotAI_Control3
+                    values (NotAI_Control3_seq.nextval, %.4f, %d, %d, %d, %d, %d, %d, %d, %d, '%s', %d)
+                    """ % (v['current_clock'], v['key'][0], v['key'][1], v['key'][2], v['key'][3], v['key'][4],
+                           v['score'], v['level'], v['line'], v['next_piece'], ng_no)
+                    # print(sql)
+                    cur.execute(sql)
+                except Exception as e:
+                    print('DB 저장 실패 :', e)
+                
+            f.close()
             
             try:
-                # print(v)
-                sql = """
-                insert into NotAI_Control3
-                values (NotAI_Control3_seq.nextval, %.4f, %d, %d, %d, %d, %d, %d, %d, %d, '%s', %d)
-                """ % (v['current_clock'], v['key'][0], v['key'][1], v['key'][2], v['key'][3], v['key'][4],
-                       v['score'], v['level'], v['line'], v['next_piece'], ng_no)
-                # print(sql)
-                cur.execute(sql)
+                con.commit()  # 실제로 DB서버에 반영          
+                con.close()
             except Exception as e:
-                print('DB 저장 실패 :', e)
-            
-        f.close()
-        
-        try:
-            con.commit()  # 실제로 DB서버에 반영          
-            con.close()
+                print('commit error :', e)
         except Exception as e:
-            print('commit error :', e)
+            print('저장 실패 :', e)
         
         return ng_no
     
@@ -306,10 +309,8 @@ class Operation:
         
         if self.delay >= 0:
             sleep(self.delay)
-            # continue
         elif self.delay > -0.5:
             pass
-            # break
         else:
             print("너무 느린 실행 속도")
             exit()
@@ -331,46 +332,35 @@ class Operation:
         self.current_clock = clock()  # 현재 시각을 저장함
         
         self.key_bool_li = []
-        # if False:# or True:
         epsilon = (0.99 ** self.game_no)
-        if(tnt.randf(0, 1) > epsilon) and self.ai_sw and False:
-            # with tf2.Session() as sess: 
-            if True:
-                # Restore variables from disk.
-                # self.saver.restore(sess, os.getcwd() + "/model.ckpt")
-                # print('saved model is loaded!')
-                
-                img = self.full_screenshot[self.y1:self.y2 + 1, self.x1:self.x2 + 1,:3]
-                img = _pooling(4, 4, img, min_sw=True)
-                img = rgb2gray(img)
-                # print(img, img.shape)
-                img = img.flatten()
-                # print(img, img.shape)
-                # exit()
-                
-                q = sess.run(tnt.output_layer, feed_dict={tnt.X:[img]})
-                # Find the max index (the chosen action).
-                index = q.argmax()
-                print(q, index)
-                action = index  # + 1
-                for i, v in enumerate(self.number2key_li[action]):
-                    if v and control_switch and self.key_state[i]!=v:
-                        # self.key_bool_li.append(1)
-                        platformModule._keyDown(self.key_li2[i])
-                    elif self.key_state[i]!=v:
-                        # self.key_bool_li.append(0)
-                        platformModule._keyUp(self.key_li2[i])
-                    self.key_bool_li.append(int(v))
-                    self.key_state[i] = v
+        if(tnt.randf(0, 1) > epsilon) and self.ai_sw:# and False:
+            img = self.full_screenshot[self.y1:self.y2 + 1, self.x1:self.x2 + 1,:3]
+            # img = _pooling(4, 4, img, min_sw=True)
+            img = _pooling(2, 2, img, min_sw=True)
+            img = rgb2gray(img)
+            # print(img, img.shape)
+            img = img.flatten()
+            # print(img, img.shape)
+            # exit()
+            
+            q = sess.run(tnt.output_layer, feed_dict={tnt.X:[img]})
+            # Find the max index (the chosen action).
+            index = q.argmax()
+            print(q, index)
+            action = index  # + 1
+            for i, v in enumerate(self.number2key_li[action]):
+                if v and control_switch and self.key_state[i]!=v:
+                    platformModule._keyDown(self.key_li2[i])
+                elif self.key_state[i]!=v:
+                    platformModule._keyUp(self.key_li2[i])
+                self.key_bool_li.append(int(v))
+                self.key_state[i] = v
         else:
             try:
-                # for i, v in enumerate(self.number2key_li[1]):
                 for i, v in enumerate(choice(self.number2key_li)):
                     if v and control_switch and self.key_state[i]!=v:
-                        # self.key_bool_li.append(1)
                         platformModule._keyDown(self.key_li2[i])
                     elif self.key_state[i]!=v:
-                        # self.key_bool_li.append(0)
                         platformModule._keyUp(self.key_li2[i])
                     self.key_bool_li.append(int(v))
                     self.key_state[i] = v
@@ -401,8 +391,6 @@ class Operation:
                          'next_piece':self.next_piece,
                          'screenshot':self.full_screenshot})
         self.t2 = clock()
-        # "%11s %5s %3s %4s %25s %50s %1s %7s %7s %7s
-        # print("%11.4f %5d %3d %4d %d %d %d %d %d %70s %1s %7.5f %7.5f %7.5f" % (self.current_clock, self.score, self.level,
         print("%11.4f %5d %3d %4d %d %d %d %d %d %1s %7.5f %7.5f %7.5f %5d %7.6f" % (self.current_clock, self.score, self.level,
                                                                                      self.line, self.key_bool_li[0],
                                                                                      self.key_bool_li[1], self.key_bool_li[2],
@@ -412,20 +400,7 @@ class Operation:
                                                                                      self.t2 - self.t1, self.t4 - self.t3,
                                                                                      self.t6 - self.t5, self.game_no, self.delay))
         # print(self.next_piece, t2 - t1)
-        # while True:
         self.jiyeon()
-        # self.game_time = clock() - self.start_game_clock  # 게임이 시작하고 나서 지난 시간
-        # self.delay = self.second_per_frame * self.cnt - self.game_time  # 기다려야 하는 시간(1초에 fps번만 캡쳐해야 함)
-        # print(cnt, game_time, delay)
-        # if self.delay >= 0:
-            # sleep(self.delay)
-            # # continue
-        # elif self.delay > -0.5:
-            # pass
-            # # break
-        # else:
-            # print("너무 느린 실행 속도")
-            # exit()
         self.cnt += 1
         return True
     
@@ -471,7 +446,7 @@ class Operation:
         print("%11s %5s %3s %4s %s %s %s %s %s %1s %7s %7s %7s" % ('clock', 'score', 'lev', 'line',
                                                                               'z', 'x', 'l', 'r', 'd',
                                                                               'p', 'tForCal', 'tForCap', 'tForPus'))
-        with tf2.Session() as sess:
+        with tf.Session() as sess:
             try:
                 self.saver.restore(sess, os.getcwd() + "/model.ckpt")
                 self.ai_sw = True
@@ -533,9 +508,9 @@ class Operation:
         self.game_no = self.save_data()
         print('데이터 저장 완료', clock())
         
-        # print('학습 중', clock())
-        # tnt.main(self.game_no, self.game_no)  # 방금 진행한 판 학습
-        # print('학습 완료', clock())
+        print('학습 중', clock())
+        tnt.main(self.game_no, self.game_no)  # 방금 진행한 판 학습
+        print('학습 완료', clock())
             
         _press('left', 0.5)
         _press('down', 0.5)
