@@ -50,11 +50,11 @@ maxMemory = 500  # 메모리의 크기(과거 경험을 저장하는 위치).
 batchSize = 50
 
 gridSize_x = 41 # 82  # 24 # 96  # 게임 화면 크기(가로)
-gridSize_y = 41 # 82  # 36 # 144  # 게임 화면 크기(세로)
+gridSize_y = 72 # 41 # 82  # 36 # 144  # 게임 화면 크기(세로)
 chanel = 3  # 채널 수
 nbStates = gridSize_x * gridSize_y  # We eventually flatten to a 1d tensor to feed the network.
 discount = 0.9  # 할인은 네트워크가 보상을 더 빨리 받을 수 있는 상태를 선택하도록 하는 데 사용됩니다(0에서 1).
-learningRate = 0.000000001  # 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
+learningRate = 0.00000001  # 0.2  # Learning Rate for Stochastic Gradient Descent (our optimizer).
 
 # tf2.Variable(tf.random_uniform([len(xData[0]),100],-1, 1, tf2.float64))
 # Create the base model.
@@ -233,6 +233,22 @@ class NotTetris2:
             self.frames = []
             for i in cur:
                 # print(i, self.frames)
+                key_bool_li = [i[2], i[3], i[4], i[5], i[6]]
+                img_path = _dir + '\\%.4f_%s.png' % (i[1], key_bool_li)
+                
+                cut_img = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # pilimg.open(img_path)
+                # cut_img2= cut_img
+                cut_img = cv2.cvtColor(cut_img, cv2.COLOR_BGR2RGB)
+                cut_img = cut_img[self.y1:self.y2 + 1, self.x1:self.x2 + 1,:]
+                cut_img = NotAI._pooling(2, 2, cut_img, min_sw=True)[:,:, 0]
+                cut_img = cut_img.flatten()
+                
+                # 이전 이미지와 같으면 해당 프레임의 데이터는 학습 데이터에 포함하지 않음
+                if len(self.frames) >= 1 and np.all(self.frames[-1]['screenshot']==cut_img):
+                    # plt.imshow(cut_img2)
+                    # plt.show()
+                    continue
+                    
                 self.frames.append({})
                 self.frames[-1]['nc_no'] = i[0]
                 self.frames[-1]['current_clock'] = i[1]
@@ -245,12 +261,11 @@ class NotTetris2:
                 self.frames[-1]['level'] = i[8]
                 self.frames[-1]['line'] = i[9]
                 self.frames[-1]['next_block'] = i[10]
-                key_bool_li = [i[2], i[3], i[4], i[5], i[6]]
-                img_path = _dir + '\\%.4f_%s.png' % (i[1], key_bool_li)
                 self.frames[-1]['key'] = self.oper.key_bool_li2number(self.oper.nbActions, key_bool_li)
+                self.frames[-1]['screenshot'] = cut_img
                 # print(self.frames[-1])
-                self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # pilimg.open(img_path)
-                self.frames[-1]['screenshot'] = cv2.cvtColor(self.frames[-1]['screenshot'], cv2.COLOR_BGR2RGB)
+                # self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # pilimg.open(img_path)
+                # self.frames[-1]['screenshot'] = cv2.cvtColor(self.frames[-1]['screenshot'], cv2.COLOR_BGR2RGB)
                 # # print(self.frames[-1]['screenshot'].shape)
                 # self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2+1, self.x1:self.x2+1, :]
                 # # print(self.frames[-1]['screenshot'].shape)
@@ -263,9 +278,11 @@ class NotTetris2:
                 # # plt.imshow(self.frames[-1]['screenshot'])
                 # # plt.show()
                 
-                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2 + 1, self.x1:self.x2 + 1,:]
-                self.frames[-1]['screenshot'] = NotAI._pooling(2, 2, self.frames[-1]['screenshot'], min_sw=True)[:,:, 0]
-                self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'].flatten()
+                # self.frames[-1]['screenshot'] = cv2.imread(img_path, cv2.IMREAD_GRAYSCALE)  # pilimg.open(img_path)
+                # self.frames[-1]['screenshot'] = cv2.cvtColor(self.frames[-1]['screenshot'], cv2.COLOR_BGR2RGB)
+                # self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'][self.y1:self.y2 + 1, self.x1:self.x2 + 1,:]
+                # self.frames[-1]['screenshot'] = NotAI._pooling(2, 2, self.frames[-1]['screenshot'], min_sw=True)[:,:, 0]
+                # self.frames[-1]['screenshot'] = self.frames[-1]['screenshot'].flatten()
                 
                 # Image.fromarray(self.frames[-1]['screenshot'], 'RGB').show()
                 # exit()
@@ -376,7 +393,8 @@ def main(start, end):
         # 환경 변수(게임 판의 크기, 행동 상태?) 설정
         # env = CatchEnvironment(gridSize_x, gridSize_y)
         # env = NotTetris2(sess, 3, 26, 98, 169, gridSize_x, gridSize_y, chanel, nbActions)
-        env = NotTetris2(sess, 17, 88, 98, 169, gridSize_x, gridSize_y, chanel, nbActions)
+        # env = NotTetris2(sess, 17, 88, 98, 169, gridSize_x, gridSize_y, chanel, nbActions)
+        env = NotTetris2(sess, 17, 26, 98, 169, gridSize_x, gridSize_y, chanel, nbActions)
         # t1 = clock()
         # env.load_game(3)
         # for i in env.frames:
@@ -452,6 +470,10 @@ def main(start, end):
                 reward = env.frames[cnt]['score'] - env.frames[cnt - 1]['score']
                 gameOver = cnt + 1 >= len(env.frames) - 15
                 # stateInfo = #env.act(action)
+                
+                key = env.frames[cnt]
+                if key['x'] or  key['z'] or key['left'] or key['right'] or  key['down']: # 행동을 했는데 점수를 얻지 못한 경우
+                    reward -= 1 # 1점 감점
                         
                 # if (reward == 1):
                     # winCount = winCount + 1

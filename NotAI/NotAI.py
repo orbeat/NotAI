@@ -24,7 +24,8 @@ class Operation:
     def __init__(self, db='choi', db_name='choi', ip='localhost'):
         clock()
         self.db, self.db_name, self.ip = db, db_name, ip
-        self.x1, self.y1, self.x2, self.y2 = 17, 88, 98, 169#3, 26, 98, 169
+        # self.x1, self.y1, self.x2, self.y2 = 17, 88, 98, 169#3, 26, 98, 169
+        self.x1, self.y1, self.x2, self.y2 = 17, 26, 98, 169#3, 26, 98, 169
         
         font = np.array(pilimg.open(r'img\font.png'))  # 글씨체 이미지를 읽어옴
         self.number_font = []
