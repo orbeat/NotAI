@@ -441,7 +441,7 @@ def main(start, end):
             # print(list(range(len(env.frames))))
             frame_li = list(range(len(env.frames)))
             # shuffle(frame_li)
-            for cnt in frame_li:
+            for arr, cnt in enumerate(frame_li):
                 print('cnt :', cnt)
             # for j in range(1, len(env.frames)-15):
                 # t1 = clock()
@@ -456,15 +456,16 @@ def main(start, end):
                     # # Find the max index (the chosen action).
                     # index = q.argmax()
                     # action = index + 1         
-                    # print(q, index)   
-                q = sess.run(output_layer, feed_dict={X:[currentState]})
-                # q = sess.run(env.model.logits, feed_dict={env.model.X:[currentState]})
-                index = q.argmax()
-                print(q, index)      
+                    # print(q, index)
+                if True:#arr%100==1:# or __name__=='__main__':
+                    q = sess.run(output_layer, feed_dict={X:[currentState]})
+                    # q = sess.run(env.model.logits, feed_dict={env.model.X:[currentState]})
+                    index = q.argmax()
+                    print(q, index)      
 
                 # Decay the epsilon by multiplying by 0.999, not allowing it to go below a certain threshold.
-                if (epsilon > epsilonMinimumValue):
-                    epsilon = epsilon * 0.999
+                # if (epsilon > epsilonMinimumValue):
+                    # epsilon = epsilon * 0.999
                 
                 nextState = env.frames[cnt]['screenshot']
                 reward = env.frames[cnt]['score'] - env.frames[cnt - 1]['score']
